@@ -1,15 +1,21 @@
 package app.logic;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 import javax.crypto.spec.PBEKeySpec;
-
-
 import javax.crypto.*;
+
+import java.io.*;
+import java.util.regex.*;
 
 public class KeyDerivator {
   private byte[] password;
@@ -22,23 +28,58 @@ public class KeyDerivator {
 
   private final int MIN_MASTER_PASSWORD_LENGTH = 12;
   private final int MAX_MASTER_PASSWORD_LENGTH = 64;
-  private final int MIN_SALT_LENGTH = 128;
-  private final int MAX_SALT_LENGTH = 256;
+  private final int SALT_LENGTH = 128;
 
-  public KeyDerivator() { 
+  List<String> weakPasswords = new ArrayList<String>();
+  Path path = Paths.get("src/main/resources/WeakPasswords.txt");
+
+  public KeyDerivator(){ 
     this.salt = getNextSalt();
     this.ITERATIONS = 210000;
+
+    path = path.toAbsolutePath();
+    String absolutePath = path.toString();
+
+    try{
+      BufferedReader bf = new BufferedReader(new FileReader(absolutePath));
+      String line = bf.readLine();
+        
+      while (line != null) {
+          weakPasswords.add(line);
+          line = bf.readLine();
+      }
+      bf.close();
+    } catch (IOException ex) {
+      System.out.println(ex.getMessage());
+    }    
   }
 
-  public KeyDerivator(byte[] salt, int iter) throws InvalidSaltException { 
-    this.salt = salt;
-    
+
+  public KeyDerivator(byte[] salt, int iter) throws InvalidSaltException, IOException { 
     String stringSalt = new String(salt, StandardCharsets.UTF_8);
 
-    if (stringSalt.length() < MIN_SALT_LENGTH || stringSalt.length() > MAX_SALT_LENGTH) {
-        throw new InvalidSaltException("Salt length must be at least " + MIN_SALT_LENGTH + " and mist be at most " + MAX_SALT_LENGTH);
+    if (stringSalt.length() != SALT_LENGTH) {
+        throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " long");
     }
+
     this.ITERATIONS = iter;
+    this.salt = salt;
+    
+    path = path.toAbsolutePath();
+    String absolutePath = path.toString();
+
+    try{
+      BufferedReader bf = new BufferedReader(new FileReader(absolutePath));
+      String line = bf.readLine();
+        
+      while (line != null) {
+          weakPasswords.add(line);
+          line = bf.readLine();
+      }
+      bf.close();
+    } catch (IOException ex) {
+      System.out.println(ex.getMessage());
+    }    
    }
 
   public void setPsw(String psw){
@@ -51,13 +92,9 @@ public class KeyDerivator {
         // TODO Auto-generated catch block
         System.out.println(e.getMessage());
       }
-
-
   }
 
   public void changePsw(String oldPsw, String newPsw){
-
-
 
   }
 
@@ -86,34 +123,57 @@ public class KeyDerivator {
         }
     }
 
-  protected void validateMasterPassword(String masterPassword) throws InvalidPasswordException {
+  public void validateMasterPassword(String masterPassword) throws InvalidPasswordException {
+    Pattern lowerCase = Pattern.compile("[a-z]");
+    Pattern upperCase = Pattern.compile("[A-Z]");
+    Pattern digit = Pattern.compile("[0-9]");
+    Pattern special = Pattern.compile ("[?= !\\\"#$%&'()*+,-./:;<=>?@[\\\\^_`{|}~]]");
+    
+    Matcher hasLowerCase = lowerCase.matcher(masterPassword);
+    Matcher hasUpperCase = upperCase.matcher(masterPassword);
+    Matcher hasDigit = digit.matcher(masterPassword);
+    Matcher hasSpecial = special.matcher(masterPassword);
+
     if (masterPassword.length() < MIN_MASTER_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("Too few characters");
-        
+      throw new InvalidPasswordException("The password must contain at least "+ MIN_MASTER_PASSWORD_LENGTH + " characters");    
     }
     else if (masterPassword.length() > MAX_MASTER_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("Too many characters");
-        
+      throw new InvalidPasswordException("The password must contain a maximum of "+ MAX_MASTER_PASSWORD_LENGTH + " characters");   
     }
-    else if (masterPassword.matches("^(?=.*[A-Z])(?= !\"#$%&'()*+,-./:;<=>?@[\\^_`{|}~])(?=.*[0-9])(?=.*[a-z])")) {
-      throw new InvalidPasswordException("Invalid password");  
+    else if (!hasSpecial.find()) {
+      throw new InvalidPasswordException("The password must contain at least one special character");  
+    }
+    else if (!hasUpperCase.find()) {
+      throw new InvalidPasswordException("The password must contain at least one upper case character");
+    }
+    else if (!hasDigit.find()) {
+      throw new InvalidPasswordException("The password must contain at least one number");  
+    }
+    else if (!hasLowerCase.find()) {
+      throw new InvalidPasswordException("The password must contain at least one lower case character");  
+    }
+    else if(weakPasswords.contains(masterPassword) ? true : false){
+      throw new InvalidPasswordException("The password must not be in the list of weak passwords");  
     }
   }
 
-  class InvalidPasswordException extends Exception { 
-
-    public InvalidPasswordException(String message) 
-    { 
-        super(message); 
-    } 
-  }  
-
-  class InvalidSaltException extends Exception { 
+  public class InvalidSaltException extends Exception { 
 
     public InvalidSaltException(String message) 
     { 
         super(message); 
     } 
   }
+
+  public class InvalidPasswordException extends Exception { 
+
+    public InvalidPasswordException(final String message){ 
+        super(message); 
+    }
+}  
   
 }
+
+
+
+  
