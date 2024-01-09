@@ -175,6 +175,24 @@ public class KeyManager {
   }
 
   /**
+   * Get the master key
+   * 
+   * @return SecretKey master key
+   */
+  public SecretKey getMasterKey() {
+    return new SecretKeySpec(this.masterKey, "AES");
+  }
+
+  /**
+   * Get key derivator salt
+   * 
+   * @return byte[] salt
+   */
+  public byte[] getSalt() {
+    return this.kd.getSalt();
+  }
+
+  /**
    * Get the wrapped authentication key
    * 
    * @return byte[]  wrapped authentication key
