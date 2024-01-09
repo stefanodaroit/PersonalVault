@@ -1,22 +1,23 @@
 package app;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.spec.InvalidKeySpecException;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.*;
-
-import java.io.*;
-import java.util.regex.*;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
 
 public class KeyDerivator {
   private byte[] password;                                              // Byte representation of the input password
@@ -63,7 +64,7 @@ public class KeyDerivator {
 
     // If the salt is not 128 bytes length, generate an InvalidSaltException
     if (salt.length != SALT_LENGTH) {
-        throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " bytes long");
+      throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " bytes long");
     }
 
     this.salt = salt;
@@ -113,7 +114,7 @@ public class KeyDerivator {
 
     // If the salt is not 128 bytes length, generate an InvalidSaltException
     if (salt.length != SALT_LENGTH) {
-        throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " bytes long");
+      throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " bytes long");
     }
    
     this.salt = salt;
@@ -178,21 +179,21 @@ public class KeyDerivator {
 
     try {
 
-        // Generate a new factory for secret keys
-        SecretKeyFactory skf = SecretKeyFactory.getInstance( "PBKDF2WithHmacSHA512");
+      // Generate a new factory for secret keys
+      SecretKeyFactory skf = SecretKeyFactory.getInstance( "PBKDF2WithHmacSHA512");
 
-        // Convert the password characters to a PBE key by creating an instance of the appropriate secret-key factory
-        PBEKeySpec spec = new PBEKeySpec(password, salt, iterations, keyLength);
+      // Convert the password characters to a PBE key by creating an instance of the appropriate secret-key factory
+      PBEKeySpec spec = new PBEKeySpec(password, salt, iterations, keyLength);
 
-        // Generate a SecretKey object from the provided key specification
-        SecretKey key = skf.generateSecret(spec);
+      // Generate a SecretKey object from the provided key specification
+      SecretKey key = skf.generateSecret(spec);
 
-        // Convert SecretKey key to byte[]
-        byte[] res = key.getEncoded( );
-        return res;
+      // Convert SecretKey key to byte[]
+      byte[] res = key.getEncoded( );
+      return res;
 
     } catch ( NoSuchAlgorithmException | InvalidKeySpecException e ) {
-        throw new RuntimeException( e );
+      throw new RuntimeException( e );
     }
   }
 
@@ -267,7 +268,7 @@ public class KeyDerivator {
    * Method to read the WeakPasswords.txt file and store 
    * the file's passwords in the weak passwords list
    */
-  private void readFile(){
+  private void readFile() {
     // Convert the path in an absolute path
     path = path.toAbsolutePath();
     // Convert type path in string
@@ -282,8 +283,8 @@ public class KeyDerivator {
       
       // Add all lines of the weakPasswords.txt file in the weak passwords list
       while (line != null) {
-          weakPasswords.add(line);
-          line = bf.readLine();
+        weakPasswords.add(line);
+        line = bf.readLine();
       }
 
       // Close the buffer reader
@@ -301,8 +302,7 @@ public class KeyDerivator {
      * 
      * @param message String  error message
      */
-    public InvalidSaltException(String message) 
-    { 
+    public InvalidSaltException(String message) { 
         super(message); 
     } 
   }
@@ -314,7 +314,7 @@ public class KeyDerivator {
      * 
      * @param message String  error message
      */
-    public InvalidPasswordException(final String message){ 
+    public InvalidPasswordException(final String message) { 
         super(message); 
     }
   }  
