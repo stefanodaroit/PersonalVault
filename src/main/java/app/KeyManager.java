@@ -1,28 +1,31 @@
 package app;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+
+import app.KeyDerivator.InvalidPasswordException;
 import app.KeyDerivator.InvalidSaltException;
 
 public class KeyManager {
 
+  private static final String ALG_WRAP_KEYS  = "AESWrap", 
+                              PROV_WRAP_KEYS = "SunJCE";
+
   private KeyDerivator kd;                    // Key Derivator for generate master key
   private SecureRandom gen;                   // Secure random bytes generator 
-  private SecretKey encryptionKey;            // Encryption key
-  private SecretKey authenticationKey;        // Authentication (or MAC) key
 
   private byte[] wrapEncKey;                  // Wrapped encryption key
   private byte[] wrapAuthKey;                 // Wrapped authentication key
-  private SecretKey unwrapEncKey;             // Unwrapped encryption key
-  private SecretKey unwrapAuthKey;            // Unwrapped authentication key
+  private SecretKey encryptionKey;            // Encryption key
+  private SecretKey authenticationKey;        // Authentication (or MAC) key
 
   private byte[] masterKey;                   // Master key         
 
@@ -70,10 +73,9 @@ public class KeyManager {
       throw new IllegalArgumentException("The authentication key cannot be null");
     }
 
-    // Convert 256 bits of encryption key to secret key
-    this.encryptionKey = new SecretKeySpec(encKey, "AES");
-    // Convert 256 bits of authentication key to secret key
-    this.authenticationKey = new SecretKeySpec(authKey, "AES");
+    // Store wrapped keys
+    this.wrapEncKey = encKey;
+    this.wrapAuthKey = authKey;
 }
 
   /**
@@ -87,8 +89,9 @@ public class KeyManager {
    * @throws NoSuchPaddingException
    * @throws InvalidKeyException
    * @throws IllegalBlockSizeException
+   * @throws InvalidPasswordException
    */
-  public void wrapSecretKeys(String psw) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException{
+  public void wrapSecretKeys(String psw) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidPasswordException{
       
     // Set the password anche check its validity
     kd.setPsw(psw);
@@ -97,11 +100,11 @@ public class KeyManager {
     this.masterKey = kd.getMasterKey();
 
     // Generate the two secret keys
-    SecretKey firstKey = generateFirstKey(this.masterKey);
-    SecretKey secondKey = generateSecondKey(this.masterKey);
+    SecretKey firstKey = getEncKEK(this.masterKey);
+    SecretKey secondKey = getAuthKEK(this.masterKey);
 
     // Wrap the encryption key
-    Cipher cipher = Cipher.getInstance("AESWrap", "SunJCE");
+    Cipher cipher = Cipher.getInstance(ALG_WRAP_KEYS, PROV_WRAP_KEYS);
     cipher.init(Cipher.WRAP_MODE, firstKey);
     wrapEncKey = cipher.wrap(encryptionKey);
 
@@ -119,8 +122,9 @@ public class KeyManager {
    * @throws NoSuchAlgorithmException
    * @throws NoSuchProviderException
    * @throws NoSuchPaddingException
+   * @throws InvalidPasswordException
    */
-  public void unwrapSecretKeys(String psw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException{
+  public void unwrapSecretKeys(String psw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidPasswordException{
 
     // Set the password anche check its validity
     kd.setPsw(psw);
@@ -129,17 +133,17 @@ public class KeyManager {
     this.masterKey = kd.getMasterKey();
 
     // Generate the two secret keys
-    SecretKey firstKey = generateFirstKey(this.masterKey);
-    SecretKey secondKey = generateSecondKey(this.masterKey);
+    SecretKey firstKey = getEncKEK(this.masterKey);
+    SecretKey secondKey = getAuthKEK(this.masterKey);
 
     // Unwrap the encryption key
-    Cipher cipher = Cipher.getInstance("AESWrap", "SunJCE");
+    Cipher cipher = Cipher.getInstance(ALG_WRAP_KEYS, PROV_WRAP_KEYS);
     cipher.init(Cipher.UNWRAP_MODE, firstKey);
-    unwrapAuthKey = (SecretKey) cipher.unwrap(wrapEncKey, "AES", Cipher.SECRET_KEY);
+    encryptionKey = (SecretKey) cipher.unwrap(wrapEncKey, "AES", Cipher.SECRET_KEY);
 
     // Unwrap the authentication key
     cipher.init(Cipher.UNWRAP_MODE, secondKey);
-    unwrapEncKey = (SecretKey) cipher.unwrap(wrapAuthKey, "AES", Cipher.SECRET_KEY);
+    authenticationKey = (SecretKey) cipher.unwrap(wrapAuthKey, "AES", Cipher.SECRET_KEY);
   }
 
   /**
@@ -148,7 +152,7 @@ public class KeyManager {
    * @param masterKey 512 bit master key
    * @return first 256 bit secret key
    */
-  private SecretKey generateFirstKey(byte[] masterKey){
+  private SecretKey getEncKEK(byte[] masterKey){
 
     // First 256 bits of the master key
     byte[] first256 = new byte[32];
@@ -164,7 +168,7 @@ public class KeyManager {
    * @param masterKey 512 bit master key
    * @return last 256 bit secret key
    */
-  private SecretKey generateSecondKey(byte[] masterKey){
+  private SecretKey getAuthKEK(byte[] masterKey){
 
     // Last 256 bits of the master key
     byte[] second256 = new byte[32];
@@ -216,7 +220,7 @@ public class KeyManager {
    * @return byte[]  unwrapped encryption key
    */
   public SecretKey getUnwrapEncKey() {
-    return this.unwrapEncKey;
+    return this.encryptionKey;
   }
 
   /**
@@ -225,7 +229,7 @@ public class KeyManager {
    * @return byte[]  unwrapped authentication key
    */
   public SecretKey getUnwrapAuthKey() {
-    return this.unwrapAuthKey;
+    return this.authenticationKey;
   }
 
 }
