@@ -1,8 +1,6 @@
 package app;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.InvalidKeyException;
@@ -15,6 +13,8 @@ import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
+import app.KeyDerivator.InvalidSaltException;
+
 public class Vault {
 
   private final String ALG_HMAC_TOK= "HmacSHA512";
@@ -22,13 +22,16 @@ public class Vault {
 
   // TO DO: UUID
   private static int counter = 0;
+  private int vid;
   
-  public String storagePath;
-  public VaultConfiguration conf;
+  private String storagePath;
+  private VaultConfiguration conf;
+  private byte[] confMac;
 
   private KeyManager km;
   
-  Vault(String storagePath, String psw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IllegalBlockSizeException {
+  public Vault(String storagePath, String psw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IllegalBlockSizeException {
+    this.vid = counter ++;
     this.storagePath = storagePath;
     
     // Create and wrap secret keys
@@ -36,8 +39,53 @@ public class Vault {
     this.km.wrapSecretKeys(psw);
     
     // Create and save vault configuration
-    this.conf = new VaultConfiguration(counter++, storagePath, this.km.getSalt(), this.km.getWrapEncKey(), this.km.getWrapAuthKey());
+    this.conf = new VaultConfiguration(this.vid, this.km.getSalt(), this.km.getWrapEncKey(), this.km.getWrapAuthKey());
     writeConfiguration();
+  }
+
+  public Vault(int vid, String storagePath) throws InvalidSaltException {
+    this.vid = vid;
+    this.storagePath = storagePath;
+    
+    // Read vault configuration and init key manager
+    readConfiguration();
+    this.km = new KeyManager(this.conf.getEncKey(), this.conf.getAuthKey(), this.conf.getSalt());
+  }
+
+
+  public void lock() {}
+  
+  public void unlock(String psw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException {
+    this.km.unwrapSecretKeys(psw);
+    
+    // try {
+    //   byte[] serializedConf = VaultConfiguration.serialize(this.conf);
+    //   byte[] encodedConf = Base64.getEncoder().withoutPadding().encode(serializedConf);
+    //   byte[] mac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), encodedConf);
+    //   System.out.println(mac.equals(confMac));
+    // } catch (IOException e) {
+    //   e.printStackTrace();
+    // }
+  }
+
+  /*
+   * Read the vault configuration from the file system
+   */
+  public void readConfiguration() {    
+    System.out.print("Reading configuration file... ");
+    
+    try {
+      // Read and decode token from the vault root
+      byte[] token = Files.readAllBytes(Paths.get(VaultConfiguration.getPath(this.storagePath, this.vid)));
+      byte[] serializedConf = decodeToken(token); 
+      
+      // Deserialize VaultConfiguration object
+      this.conf = VaultConfiguration.deserialize(serializedConf);
+    } catch (Exception e) {
+      System.out.println("Error while reading configuration file");
+    }
+    
+    System.out.println("DONE");
   }
 
  /**
@@ -48,17 +96,11 @@ public class Vault {
     
     try {
       // Serialize the VaultConfiguration object 
-      ByteArrayOutputStream bos = new ByteArrayOutputStream();
-      ObjectOutputStream out = new ObjectOutputStream(bos);  
-      out.writeObject(this.conf);
-      byte[] serializedConf = bos.toByteArray();      
+      byte[] serializedConf = VaultConfiguration.serialize(this.conf);
       
-      // Generate a token with MAC and save it in a file in the vault root
-      byte[] token = createToken(serializedConf);
-      Files.write(Paths.get(this.conf.getPath()), token);
-      
-      out.close();
-      bos.close();
+      // Generate a token with MAC and save it in the vault root
+      byte[] token = encodeToken(serializedConf);
+      Files.write(Paths.get(VaultConfiguration.getPath(this.storagePath, this.vid)), token);
     } catch (IOException e) {
       System.out.println("Error while saving configuration file");
     }
@@ -73,7 +115,7 @@ public class Vault {
    * 
    * @return byte[] base64 encoded token as array of bytes
    */
-  private byte[] createToken(byte[] payload) {
+  private byte[] encodeToken(byte[] payload) {
     // Encode payload in base64
     byte[] encodedPayload = Base64.getEncoder().withoutPadding().encode(payload);
 
@@ -88,6 +130,23 @@ public class Vault {
     System.arraycopy(encodedMac,  0, token, encodedPayload.length + 1, encodedMac.length);
 
     return token;
+  }
+
+  /**
+   * Extract the payload from a base64 encoded token and store the MAC
+   * 
+   * @param token byte[]: the token
+   * 
+   * @return byte[] payload: the content of the token
+   */
+  private byte[] decodeToken(byte[] token) {
+    String tmp = new String(token);
+    String tok[] = tmp.split("\\" + PERIOD);
+
+    byte[] decodedPayload = Base64.getDecoder().decode(tok[0].getBytes());
+    this.confMac = Base64.getDecoder().decode(tok[1].getBytes());
+
+    return decodedPayload;
   }
 
    /**
