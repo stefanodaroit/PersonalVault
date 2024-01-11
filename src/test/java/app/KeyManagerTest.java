@@ -15,7 +15,9 @@ import org.apache.commons.codec.binary.BinaryCodec;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
-import app.KeyDerivator.InvalidSaltException;
+import app.core.KeyManager;
+import app.core.KeyDerivator.InvalidPasswordException;
+import app.core.KeyDerivator.InvalidSaltException;
 
 public class KeyManagerTest {
 
@@ -80,7 +82,7 @@ public class KeyManagerTest {
   }
 
   @Test
-  public void testWrapNullPsw() throws IOException, InvalidSaltException, InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IllegalBlockSizeException
+  public void testWrapNullPsw() throws IOException, InvalidSaltException, InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IllegalBlockSizeException, InvalidPasswordException
   {     
     String exceptionMessage = "";
     try {
@@ -93,7 +95,7 @@ public class KeyManagerTest {
   }
 
   @Test
-  public void testUnwrapNullPsw() throws IOException, InvalidSaltException, InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IllegalBlockSizeException
+  public void testUnwrapNullPsw() throws IOException, InvalidSaltException, InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IllegalBlockSizeException, InvalidPasswordException
   {     
     String exceptionMessage = "";
     try {

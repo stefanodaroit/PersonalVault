@@ -13,6 +13,7 @@
 *.tar.gz
 *.rar
 
-# Target directory
+# Custom
 target
 .vscode
+*.vault

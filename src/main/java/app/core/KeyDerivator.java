@@ -1,4 +1,4 @@
-package app;
+package app.core;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -15,9 +18,6 @@ import java.util.regex.Pattern;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.spec.InvalidKeySpecException;
 
 public class KeyDerivator {
   private byte[] password;                                              // Byte representation of the input password
@@ -33,7 +33,7 @@ public class KeyDerivator {
   private final int SALT_LENGTH = 128;                                  // Salt length
 
   List<String> weakPasswords = new ArrayList<String>();                 // List of weak passwords
-  Path path = Paths.get("src/main/resources/WeakPasswords.txt");  // Path for the file with weak passwords 
+  Path path = Paths.get("src/main/resources/WeakPasswords.txt");        // Path for the file with weak passwords 
 
   /**
    * KeyDerivator class constructor for the first initialization of the salt:
@@ -64,39 +64,33 @@ public class KeyDerivator {
 
     // If the salt is not 128 bytes length, generate an InvalidSaltException
     if (salt.length != SALT_LENGTH) {
-      throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " bytes long");
+      throw new InvalidSaltException();
     }
 
     this.salt = salt;
 
     // Read the weakPasswords.txt file and inserts the weak passwords into the list
     readFile();
-    
    }
 
   /**
    * Method for initializing the new password entered, verifying its security
    * 
    * @param psw password
+   * @throws InvalidPasswordException
    */
-  public void setPsw(String psw){
+  public void setPsw(String psw) throws InvalidPasswordException {
 
     // If the password is null, generate an IllegalArgumentException
     if(psw == null){
       throw new IllegalArgumentException("The password cannot be null");
     }
    
-    try {
+    // Validate the inserted password
+    validatePassword(psw);
 
-      // Validate the inserted password
-      validatePassword(psw);
-
-      // Convert the entered password to bytes[]
-      this.password = psw.getBytes(StandardCharsets. UTF_8);
-
-    } catch (InvalidPasswordException e) {
-      System.out.println(e.getMessage());
-    }
+    // Convert the entered password to bytes[]
+    this.password = psw.getBytes(StandardCharsets. UTF_8);
   }
 
   /**
@@ -114,7 +108,7 @@ public class KeyDerivator {
 
     // If the salt is not 128 bytes length, generate an InvalidSaltException
     if (salt.length != SALT_LENGTH) {
-      throw new InvalidSaltException("The salt must be " + SALT_LENGTH + " bytes long");
+      throw new InvalidSaltException();
     }
    
     this.salt = salt;
@@ -230,12 +224,12 @@ public class KeyDerivator {
 
     // If the password is too short, generate an InvalidPasswordException
     if (password.length() < MIN_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("The password must contain at least "+ MIN_PASSWORD_LENGTH + " characters");    
+      throw new InvalidPasswordException("The password must contain at least " + MIN_PASSWORD_LENGTH + " characters");    
     }
 
     // If the password is too long, generate an InvalidPasswordException
     else if (password.length() > MAX_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("The password must contain a maximum of "+ MAX_PASSWORD_LENGTH + " characters");   
+      throw new InvalidPasswordException("The password must contain a maximum of " + MAX_PASSWORD_LENGTH + " characters");   
     }
 
     // If the password has not a special character, generate an InvalidPasswordException
@@ -296,26 +290,14 @@ public class KeyDerivator {
   }
 
   public class InvalidSaltException extends Exception { 
-
-    /**
-     * InvalidSaltException class constructor specifying the error message
-     * 
-     * @param message String  error message
-     */
-    public InvalidSaltException(String message) { 
-        super(message); 
+    public InvalidSaltException() { 
+      super("The salt must be " + SALT_LENGTH + " bytes long"); 
     } 
   }
 
   public class InvalidPasswordException extends Exception { 
-
-    /**
-     * InvalidPasswordException class constructor specifying the error message
-     * 
-     * @param message String  error message
-     */
     public InvalidPasswordException(final String message) { 
-        super(message); 
+      super(message); 
     }
   }  
 }
