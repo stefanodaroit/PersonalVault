@@ -1,5 +1,7 @@
 package app;
 
+import app.core.Vault;
+
 public class TestMain {
   public static void main(String[] args) {
     String psw = "Password1234!";

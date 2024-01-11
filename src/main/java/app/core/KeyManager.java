@@ -1,4 +1,4 @@
-package app;
+package app.core;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -11,8 +11,8 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 
-import app.KeyDerivator.InvalidPasswordException;
-import app.KeyDerivator.InvalidSaltException;
+import app.core.KeyDerivator.InvalidPasswordException;
+import app.core.KeyDerivator.InvalidSaltException;
 
 public class KeyManager {
 

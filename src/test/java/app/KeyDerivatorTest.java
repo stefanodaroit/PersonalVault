@@ -7,8 +7,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import org.apache.commons.codec.binary.BinaryCodec;
 
-import app.KeyDerivator.InvalidPasswordException;
-import app.KeyDerivator.InvalidSaltException;
+import app.core.KeyDerivator;
+import app.core.KeyDerivator.InvalidPasswordException;
+import app.core.KeyDerivator.InvalidSaltException;
 
 /**
  * Unit test for KeyDerivator class
@@ -18,7 +19,7 @@ public class KeyDerivatorTest{
   private KeyDerivator kd = new KeyDerivator();
   
   @Test
-  public void testCorrectPsw()
+  public void testCorrectPsw() throws InvalidPasswordException
   {   
     String password = "dhfmn284BBB'''13.";
     kd.setPsw(password);
@@ -28,7 +29,7 @@ public class KeyDerivatorTest{
   }
 
   @Test
-  public void testNullPsw()
+  public void testNullPsw() throws InvalidPasswordException
   {   
     String exceptionMessage = "";
     try {
@@ -165,7 +166,7 @@ public class KeyDerivatorTest{
   }
 
   @Test
-  public void testSameMasterKey() throws InvalidSaltException
+  public void testSameMasterKey() throws InvalidSaltException, InvalidPasswordException
   {   
     String password = "dhfmn284BBB'''13.";
     kd.setPsw(password);
