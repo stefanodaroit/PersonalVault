@@ -184,4 +184,16 @@ public class VaultTest extends TestCase{
       deleteConfig(v);
     }
   }
+
+  @Test
+  public void testWrongChangePsw() throws Exception {   
+    try {
+      v = new Vault(PATH, PSW);
+      v.changePsw("dffg", "Password1234m.!");
+      Assert.fail("WrongPasswordException not thrown");
+    } catch (WrongPasswordException e) {   }
+  }
+
+ 
+    
 }

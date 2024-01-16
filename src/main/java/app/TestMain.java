@@ -9,9 +9,8 @@ public class TestMain {
     try {
       // Create vault
       v = new Vault(".", psw);
-      // Import vault
-      v = new Vault(0, "."); 
-      v.unlock(psw);
+      v.changePsw(psw, "eee");
+      //v.unlock(psw);
     } catch (Exception e) {
       e.printStackTrace();
     }

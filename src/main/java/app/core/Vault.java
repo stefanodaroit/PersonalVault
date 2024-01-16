@@ -4,10 +4,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.util.Arrays;
 import java.util.Base64;
 
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
 import app.core.KeyDerivator.InvalidPasswordException;
@@ -123,6 +127,44 @@ public class Vault {
       System.out.println("Error while checking configuration integrity");
       throw new InvalidConfigurationException();
     }
+  }
+
+  /**
+   * Change the password and set the new configuration
+   * 
+   * @param oldPsw String  Old password
+   * @param newPsw String  New password
+   * @throws InvalidKeyException
+   * @throws NoSuchAlgorithmException
+   * @throws NoSuchProviderException
+   * @throws NoSuchPaddingException
+   * @throws InvalidPasswordException
+   * @throws InternalException
+   * @throws IllegalBlockSizeException
+   * @throws IOException
+   * @throws WrongPasswordException
+   */
+  public void changePsw(String oldPsw, String newPsw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidPasswordException, InternalException, IllegalBlockSizeException, IOException, WrongPasswordException{
+    try {
+      // Unwrap secret keys through input password
+      this.km.unwrapSecretKeys(oldPsw);
+    } catch (InvalidPasswordException | InvalidKeyException e) {
+      throw new WrongPasswordException();
+    } 
+
+    try {
+      // Create and wrap secret keys
+      this.km = new KeyManager();
+      this.km.wrapSecretKeys(newPsw);  
+    } catch (InvalidPasswordException e) { 
+      throw e;
+    } catch (Exception e) {
+      throw new InternalException();
+    }
+    
+    // Create and save vault configuration
+    this.conf = new VaultConfiguration(this.vid, this.km.getSalt(), this.km.getWrapEncKey(), this.km.getWrapAuthKey());
+    writeConfiguration();
   }
 
   /**
@@ -309,4 +351,5 @@ public class Vault {
       super("The password is wrong"); 
     }
   }
+  
 } 
