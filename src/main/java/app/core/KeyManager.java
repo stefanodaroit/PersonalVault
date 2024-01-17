@@ -14,10 +14,9 @@ import javax.crypto.NoSuchPaddingException;
 import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.KeyDerivator.InvalidSaltException;
 
-public class KeyManager {
+import static app.core.Constants.*;
 
-  private static final String ALG_WRAP_KEYS  = "AESWrap", 
-                              PROV_WRAP_KEYS = "SunJCE";
+public class KeyManager {
 
   private KeyDerivator kd;                    // Key Derivator for generate master key
   private SecureRandom gen;                   // Secure random bytes generator 
