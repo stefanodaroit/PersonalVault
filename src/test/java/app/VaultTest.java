@@ -184,4 +184,33 @@ public class VaultTest extends TestCase{
       deleteConfig(v);
     }
   }
+
+  @Test
+  public void testChangePsw() throws Exception {   
+    v = new Vault(PATH, PSW);
+
+    // Wrong old password
+    try {
+      v.changePsw(PSW + "!", PSW + "!");
+      Assert.fail("WrongPasswordException not thrown");
+    } catch (WrongPasswordException e) {}
+
+    // Invalid new password
+    try { 
+      v.changePsw(PSW, "password");
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch (InvalidPasswordException e) {}
+    
+    // Valid change
+    v.changePsw(PSW, PSW + "!");
+
+    // Import and change psw
+    v = new Vault(v.getVid(), PATH);
+    v.changePsw(PSW + "!", PSW + "!!");
+      
+    deleteConfig(v);
+  }
+
+ 
+    
 }

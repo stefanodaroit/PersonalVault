@@ -126,6 +126,43 @@ public class Vault {
   }
 
   /**
+   * Change the password and set the new configuration
+   * 
+   * @param oldPsw String  Old password
+   * @param newPsw String  New password
+   * 
+   * @throws WrongPasswordException
+   * @throws InternalException
+   * @throws IOException
+   * @throws InvalidPasswordException
+   */
+  public void changePsw(String oldPsw, String newPsw) throws WrongPasswordException, InternalException, IOException, InvalidPasswordException {
+    try {
+      // Unwrap secret keys through old password
+      this.km.unwrapSecretKeys(oldPsw);
+    } catch (InvalidPasswordException | InvalidKeyException e) {
+      throw new WrongPasswordException();
+    } catch (Exception e) {
+      throw new InternalException();
+    } 
+
+    try {
+      // Wrap secret keys with new psw
+      this.km.wrapSecretKeys(newPsw);  
+    } catch (InvalidPasswordException e) { 
+      throw e;
+    } catch (Exception e) {
+      throw new InternalException();
+    }
+    
+    // Edit and save vault configuration
+    this.conf.setSalt(this.km.getSalt());
+    this.conf.setEncKey(this.km.getWrapEncKey());
+    this.conf.setAuthKey(this.km.getWrapAuthKey());
+    writeConfiguration();
+  }
+
+  /**
    * Read the vault configuration from the file system
    * 
    * @throws InvalidConfigurationException
@@ -309,4 +346,5 @@ public class Vault {
       super("The password is wrong"); 
     }
   }
+  
 } 

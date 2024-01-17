@@ -19,18 +19,13 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
+import static app.core.Constants.*;
+
 public class KeyDerivator {
   private byte[] password;                                              // Byte representation of the input password
   private byte[] salt;                                                  // Password salt
 
   private Random gen;                                                   // Secure random bytes generator 
-
-  private final int ITERATIONS = 210000;                                // Number of iterations
-  private final int DERIVED_KEY_LENGTH = 512;                           // Master key length
-
-  private final int MIN_PASSWORD_LENGTH = 12;                           // Minimum password length
-  private final int MAX_PASSWORD_LENGTH = 64;                           // Maximum password length
-  private final int SALT_LENGTH = 128;                                  // Salt length
 
   List<String> weakPasswords = new ArrayList<String>();                 // List of weak passwords
   Path path = Paths.get("src/main/resources/WeakPasswords.txt");        // Path for the file with weak passwords 
