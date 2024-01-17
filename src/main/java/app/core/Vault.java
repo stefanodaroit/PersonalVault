@@ -4,14 +4,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.util.Arrays;
 import java.util.Base64;
 
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
 import app.core.KeyDerivator.InvalidPasswordException;
@@ -134,27 +130,24 @@ public class Vault {
    * 
    * @param oldPsw String  Old password
    * @param newPsw String  New password
-   * @throws InvalidKeyException
-   * @throws NoSuchAlgorithmException
-   * @throws NoSuchProviderException
-   * @throws NoSuchPaddingException
-   * @throws InvalidPasswordException
-   * @throws InternalException
-   * @throws IllegalBlockSizeException
-   * @throws IOException
+   * 
    * @throws WrongPasswordException
+   * @throws InternalException
+   * @throws IOException
+   * @throws InvalidPasswordException
    */
-  public void changePsw(String oldPsw, String newPsw) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidPasswordException, InternalException, IllegalBlockSizeException, IOException, WrongPasswordException{
+  public void changePsw(String oldPsw, String newPsw) throws WrongPasswordException, InternalException, IOException, InvalidPasswordException {
     try {
-      // Unwrap secret keys through input password
+      // Unwrap secret keys through old password
       this.km.unwrapSecretKeys(oldPsw);
     } catch (InvalidPasswordException | InvalidKeyException e) {
       throw new WrongPasswordException();
+    } catch (Exception e) {
+      throw new InternalException();
     } 
 
     try {
-      // Create and wrap secret keys
-      this.km = new KeyManager();
+      // Wrap secret keys with new psw
       this.km.wrapSecretKeys(newPsw);  
     } catch (InvalidPasswordException e) { 
       throw e;
@@ -162,8 +155,10 @@ public class Vault {
       throw new InternalException();
     }
     
-    // Create and save vault configuration
-    this.conf = new VaultConfiguration(this.vid, this.km.getSalt(), this.km.getWrapEncKey(), this.km.getWrapAuthKey());
+    // Edit and save vault configuration
+    this.conf.setSalt(this.km.getSalt());
+    this.conf.setEncKey(this.km.getWrapEncKey());
+    this.conf.setAuthKey(this.km.getWrapAuthKey());
     writeConfiguration();
   }
 
