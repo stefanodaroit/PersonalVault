@@ -8,8 +8,8 @@ public class TestMain {
     Vault v;
     try {
       // Create vault
-      v = new Vault(".", psw);
-      v.changePsw(psw, "eee");
+      v = new Vault(".", psw, null);
+      //v.changePsw(psw, "eee");
       //v.unlock(psw);
     } catch (Exception e) {
       e.printStackTrace();

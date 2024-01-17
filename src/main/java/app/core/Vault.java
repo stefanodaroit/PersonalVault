@@ -13,15 +13,14 @@ import javax.crypto.SecretKey;
 import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.KeyDerivator.InvalidSaltException;
 
+import java.util.UUID;
+
+import static app.core.Constants.*;
+
 public class Vault {
 
-  private static final String ALG_HMAC_TOK= "HmacSHA512";
-  private static final char   PERIOD = '.';
+  private UUID vid;
 
-  // TO DO: UUID
-  private static int counter = 0;
-  private int vid;
-  
   private String storagePath;
   private VaultConfiguration conf;
   private byte[] confMac;
@@ -32,17 +31,18 @@ public class Vault {
    * Create a new vault in "path" using "password" for keys derivation
    * @param storagePath  The path in which store the vault
    * @param psw          The password used for key derivation
+   * @param empty        Set to null
    * 
    * @throws IOException
    * @throws InternalException
    * @throws InvalidPasswordException
    */
-  public Vault(String storagePath, String psw) throws IOException, InternalException, InvalidPasswordException {
+  public Vault(String storagePath, String psw, String empty) throws IOException, InternalException, InvalidPasswordException {
     if (storagePath == null || psw == null) {
       throw new IllegalArgumentException("Invalid vault parameters");
     }
     
-    this.vid = counter ++;
+    this.vid = UUID.randomUUID();
     this.storagePath = storagePath;
     
     try {
@@ -69,12 +69,12 @@ public class Vault {
    * @throws InvalidConfigurationException
    * @throws IOException
    */
-  public Vault(int vid, String storagePath) throws InvalidConfigurationException, IOException {
-    if (storagePath == null) {
+  public Vault(String vid, String storagePath) throws InvalidConfigurationException, IOException {
+    if (storagePath == null || vid == null) {
       throw new IllegalArgumentException("Invalid vault parameters");
     }
     
-    this.vid = vid;
+    this.vid = UUID.fromString(vid);
     this.storagePath = storagePath;
     
     try {
@@ -137,6 +137,10 @@ public class Vault {
    * @throws InvalidPasswordException
    */
   public void changePsw(String oldPsw, String newPsw) throws WrongPasswordException, InternalException, IOException, InvalidPasswordException {
+    if (oldPsw == null || newPsw == null) {
+      throw new IllegalArgumentException("Invalid passwords");
+    }
+    
     try {
       // Unwrap secret keys through old password
       this.km.unwrapSecretKeys(oldPsw);
@@ -317,7 +321,7 @@ public class Vault {
     return macResult;
   }
 
-  public int getVid() {
+  public UUID getVid() {
     return this.vid;
   }
 
