@@ -57,7 +57,7 @@ public class KeyDerivator {
       throw new IllegalArgumentException("The salt cannot be null");
     }
 
-    // If the salt is not 128 bytes length, generate an InvalidSaltException
+    // If the salt is not 128 bits length, generate an InvalidSaltException
     if (salt.length != SALT_LENGTH) {
       throw new InvalidSaltException();
     }
@@ -92,7 +92,7 @@ public class KeyDerivator {
    * Method for setting the salt
    * 
    * @param salt byte[]  salt
-   * @throws InvalidSaltException if the salt is not 128 byte length
+   * @throws InvalidSaltException if the salt is not 128 bits length
    */
   public void setSalt(byte[] salt) throws InvalidSaltException{
 
@@ -101,7 +101,7 @@ public class KeyDerivator {
       throw new IllegalArgumentException("The salt cannot be null");
     }
 
-    // If the salt is not 128 bytes length, generate an InvalidSaltException
+    // If the salt is not 128 bits length, generate an InvalidSaltException
     if (salt.length != SALT_LENGTH) {
       throw new InvalidSaltException();
     }
@@ -119,14 +119,14 @@ public class KeyDerivator {
   }
 
   /**
-   * Method to generate a 128 byte salt randomly
+   * Method to generate a 128 bits salt randomly
    * 
-   * @return byte[] salt of 128 bytes length
+   * @return byte[] salt of 128 bits length
    */
   public byte[] getNextSalt() {
 
-    // Initialize a 128 byte salt
-		byte[] salt = new byte[128];
+    // Initialize a 128 bits salt
+		byte[] salt = new byte[SALT_LENGTH];
 
     // Generate the random salt with the secure random generator
 		gen.nextBytes(salt);
@@ -158,7 +158,7 @@ public class KeyDerivator {
    * "PBKDF2WithHmacSHA512", 210000 iterations and with a derived key of 512 bit
    * 
    * @param password char[]  password in an array of chars
-   * @param salt  byte[]  128 byte salt
+   * @param salt  byte[]  128 bits salt
    * @param iterations final int number of iteration for PBKDF2 (210000) 
    * @param keyLength final int  bit-length of the derived key (512 bit)
    * 

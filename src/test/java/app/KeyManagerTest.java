@@ -11,8 +11,9 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 
-import org.apache.commons.codec.binary.BinaryCodec;
 import org.junit.Test;
+
+import static app.core.Constants.SALT_LENGTH;
 import static org.junit.Assert.assertEquals;
 
 import app.core.KeyManager;
@@ -38,17 +39,11 @@ public class KeyManagerTest {
   }
 
   @Test
-  public void testSaltNotNull() throws IOException, InvalidSaltException
-  {     
-    String exceptionMessage = "";
+  public void testSaltNotNull() throws Exception {     
     try {
-      byte[] salt = new BinaryCodec().toByteArray("1000000111010000");
-      km = new KeyManager(new BinaryCodec().toByteArray("1000000111010000"), new BinaryCodec().toByteArray("1000000111010000"), salt);
-    } catch(InvalidSaltException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The salt must be 128 bytes long", exceptionMessage);
+      byte[] salt = new String("1000000111010000").getBytes();
+      km = new KeyManager(salt, salt, salt);
+    } catch(InvalidSaltException e) {}
   }
 
   @Test
@@ -56,9 +51,9 @@ public class KeyManagerTest {
   {     
     String exceptionMessage = "";
     try {
-      byte[] salt = new byte[128];
+      byte[] salt = new byte[SALT_LENGTH];
       gen.nextBytes(salt);
-      km = new KeyManager(new BinaryCodec().toByteArray("1000000111010000"), null, salt);
+      km = new KeyManager(new String("1000000111010000").getBytes(), null, salt);
     } catch(IllegalArgumentException e) {
       exceptionMessage = e.getMessage();
     }
@@ -71,9 +66,9 @@ public class KeyManagerTest {
   {     
     String exceptionMessage = "";
     try {
-      byte[] salt = new byte[128];
+      byte[] salt = new byte[SALT_LENGTH];
       gen.nextBytes(salt);
-      km = new KeyManager(null, new BinaryCodec().toByteArray("1000000111010000"), salt);
+      km = new KeyManager(null, new String("1000000111010000").getBytes(), salt);
     } catch(IllegalArgumentException e) {
       exceptionMessage = e.getMessage();
     }

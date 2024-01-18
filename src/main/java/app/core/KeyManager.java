@@ -56,7 +56,7 @@ public class KeyManager {
    * 
    * @param encKey byte[]  stored encryption key
    * @param authKey byte[]  stored authentication key
-   * @throws InvalidSaltException if the salt is not 128 byte length
+   * @throws InvalidSaltException if the salt is not 128 bits length
    */
   public KeyManager(byte[] encKey, byte[] authKey, byte[] salt) throws InvalidSaltException{
 

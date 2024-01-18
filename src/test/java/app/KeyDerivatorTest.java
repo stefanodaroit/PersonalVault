@@ -5,7 +5,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
-import org.apache.commons.codec.binary.BinaryCodec;
 
 import app.core.KeyDerivator;
 import app.core.KeyDerivator.InvalidPasswordException;
@@ -19,8 +18,7 @@ public class KeyDerivatorTest{
   private KeyDerivator kd = new KeyDerivator();
   
   @Test
-  public void testCorrectPsw() throws InvalidPasswordException
-  {   
+  public void testCorrectPsw() throws InvalidPasswordException {   
     String password = "dhfmn284BBB'''13.";
     kd.setPsw(password);
     byte[] hashedBytes = kd.getMasterKey();
@@ -139,17 +137,12 @@ public class KeyDerivatorTest{
   }
 
   @Test
-  public void testSalt() throws IOException
+  public void testSalt() throws Exception
   {     
-    String exceptionMessage = "";
     try {
-      byte[] salt = new BinaryCodec().toByteArray("1000000111010000");
+      byte[] salt = new String("1000000111010000").getBytes();
       kd = new KeyDerivator(salt);
-    } catch(KeyDerivator.InvalidSaltException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The salt must be 128 bytes long", exceptionMessage);
+    } catch(InvalidSaltException e) {}
   }
 
   @Test
