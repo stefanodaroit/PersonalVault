@@ -1,16 +1,11 @@
 package app;
 
+import app.gui.*;
 import javafx.application.Application;
-import javafx.stage.Stage;
 
-public class Main extends Application {
-
-    @Override
-    public void start(Stage primaryStage) {
-        
-    }
+public class Main {
 
     public static void main(String[] args) {
-        launch(args);
+      Application.launch(firstPage.class, args);
     }
 }

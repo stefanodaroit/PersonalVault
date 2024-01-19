@@ -1,9 +1,18 @@
 package app.gui;
 
 import javafx.application.Application;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
@@ -19,6 +28,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import javafx.collections.ObservableList;
+import javafx.collections.FXCollections;
 
 public class firstPage extends Application {
 
@@ -26,7 +37,7 @@ public class firstPage extends Application {
     public void start(Stage primaryStage) {
         // Create buttons
         Button settingsButton = new Button("Settings");
-        Button addButton = new Button("Add");
+        Button submitButton = new Button("Add");
 
         // Create top layout with "Personal Vault" label and buttons
         HBox topPanel = new HBox(10);
@@ -42,15 +53,30 @@ public class firstPage extends Application {
 
         // Create left layout with bottom button
         VBox leftPanel = new VBox(10);
-        leftPanel.setPadding(new Insets(50));
-        AnchorPane.setBottomAnchor(addButton, 0d); // distance 0 from top
-        leftPanel.getChildren().add(addButton);
+        leftPanel.setAlignment(Pos.CENTER_LEFT);
+        
+        ChoiceBox<String> addChoice = new ChoiceBox<>();
+        addChoice.getItems().addAll("New Vault", "Existing Vault");        
+        addChoice.setValue("Add");
+        System.out.println(addChoice.getValue());
+        // Event handler for the bottomButton
+        /*addButton.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                dynamicContent.getChildren().clear();
+                // Add two buttons dynamically when bottomButton is clicked
+                final ChoiceBox<String> choiceBox = new ChoiceBox<>();
+                choiceBox.setValue("Option 1"); // Set a default value
+                String selectedOption = choiceBox.getValue();
+                leftPanel.getChildren().addAll(choiceBox);
+            }
+        });*/
+        leftPanel.getChildren().addAll(addChoice, submitButton);
         
 
         // Create right layout with some content
         VBox rightPanel = new VBox(10);
-        rightPanel.setPadding(new Insets(150));
-        //rightPanel.setBackground(new Background(new BackgroundFill(Color.BLACK, CornerRadii.EMPTY, Insets.EMPTY)));
+        rightPanel.setAlignment(Pos.CENTER_RIGHT);
 
         leftPanel.setBorder(new Border(new BorderStroke(Color.BLACK, BorderStrokeStyle.SOLID,
                     CornerRadii.EMPTY,new BorderWidths(1))));
@@ -72,7 +98,4 @@ public class firstPage extends Application {
         primaryStage.show();
     }
 
-    public static void main(String[] args) {
-        launch(args);
-    }
 }
