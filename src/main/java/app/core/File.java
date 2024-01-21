@@ -24,28 +24,72 @@ public class File {
         this.path = Paths.get(path).toString();
         this.filename = filename;
         this.gen = new SecureRandom();
+
+
+        try {
+            // TODO TO REMOVE
+            // Create a KeyGenerator object for AES
+            KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+            // Initialize the KeyGenerator with a 128-bit key size
+            keyGenerator.init(128);
+            // Generate a SecretKey
+            SecretKey secretKey = keyGenerator.generateKey();
+            this.fileKey = secretKey;
+            // Get the raw key bytes
+            byte[] keyBytes = secretKey.getEncoded();
+            System.out.println(keyBytes);
+            headerIV = new byte[]{1, 2, 3, 4, 5};
+        } catch (NoSuchAlgorithmException e) {
+            System.out.println(e);
+        }
     }
 
 
     /**
      * public method to encrypt the file
      */
-    public void encrypt(SecretKey encKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException {
-//        GCMParameterSpec spec = new GCMParameterSpec(128, cipher.getIV());
+    public void encrypt() throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, encKey);
 
-        try (InputStream is = new FileInputStream(Paths.get(this.path, this.filename).toString()); CipherOutputStream cos = new CipherOutputStream(new FileOutputStream("a" + "_chunk_0.bin"), cipher)) {
+        try {
+            byte[] iv = new byte[16];
+            this.gen.nextBytes(iv);
+            GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, this.fileKey, spec); // this.fileKey
 
+            InputStream is = new FileInputStream(Paths.get(this.path, this.filename).toString());
+            CipherOutputStream cos = new CipherOutputStream(new FileOutputStream("a" + "_chunk_0.bin"), cipher);
             // Encrypt the filename and write it as the first chunk
-//            byte[] encryptedFilename = encryptHeader(encKey);
+//            byte[] encryptedFilename = encryptFilename(inputFile, secretKey);
 //            cos.write(encryptedFilename);
 
-            this.encryptContent(is, cos, cipher);
+            byte[] buffer = new byte[64];
+            int bytesRead;
+            int chunkIndex = 0;
 
+            while ((bytesRead = is.read(buffer)) != -1) {
+                cipher.updateAAD(String.format("%d", chunkIndex).getBytes());
+                cipher.updateAAD(this.headerIV);
 
-        } catch (Exception e) {
-            System.out.println(e);
+                cos.write(buffer, 0, bytesRead);
+                if (bytesRead < buffer.length) {
+                    // If the last chunk is less than 64 bits, pad with zeros
+                    for (int i = bytesRead; i < buffer.length; i++) {
+                        cos.write(0);
+                    }
+                }
+
+                // Close the current output stream and open a new one for the next chunk
+                cos.close();
+                chunkIndex++;
+                cos = new CipherOutputStream(new FileOutputStream("a" + "_chunk_" + chunkIndex + ".bin"), cipher);
+
+                this.gen.nextBytes(iv);
+                spec = new GCMParameterSpec(128, iv);
+                cipher.init(Cipher.ENCRYPT_MODE, this.fileKey, spec);
+            }
+
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -74,28 +118,7 @@ public class File {
      * function to encrypt the content (called in encrypt())
      */
     public void encryptContent(InputStream in, CipherOutputStream cos, Cipher cipher) throws IOException {
-        byte[] buffer = new byte[8];
-        int bytesRead;
-        int chunkIndex = 0;
 
-        while ((bytesRead = in.read(buffer)) != -1) {
-            cipher.updateAAD(ByteBuffer.allocateDirect(chunkIndex).put(this.headerIV));
-//            cipher.updateAAD(this.headerIV);
-
-            cos.write(buffer, 0, bytesRead);
-
-            if (bytesRead < buffer.length) {
-                // If the last chunk is less than 64 bits, pad with zeros
-                for (int i = bytesRead; i < buffer.length; i++) {
-                    cos.write(0);
-                }
-            }
-
-            // Close the current output stream and open a new one for the next chunk
-            cos.close();
-            chunkIndex++;
-            cos = new CipherOutputStream(new FileOutputStream("a" + "_chunk_" + chunkIndex + ".bin"), cipher);
-        }
     }
 
 
