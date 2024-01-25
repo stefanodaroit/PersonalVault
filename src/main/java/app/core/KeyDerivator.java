@@ -54,7 +54,7 @@ public class KeyDerivator {
 
     // If the salt is null, generate an IllegalArgumentException
     if(salt == null){
-      throw new IllegalArgumentException("The salt cannot be null");
+      throw new NullPointerException("The salt cannot be null");
     }
 
     // If the salt is not 128 bits length, generate an InvalidSaltException
@@ -78,7 +78,7 @@ public class KeyDerivator {
 
     // If the password is null, generate an IllegalArgumentException
     if(psw == null){
-      throw new IllegalArgumentException("The password cannot be null");
+      throw new NullPointerException("The password cannot be null");
     }
    
     // Validate the inserted password
@@ -202,7 +202,7 @@ public class KeyDerivator {
     
     // If the password is null, generate an IllegalArgumentException
     if(password == null){
-      throw new IllegalArgumentException("The password cannot be null");
+      throw new NullPointerException("The password cannot be null");
     }
     
     // Generate regex patter for rules

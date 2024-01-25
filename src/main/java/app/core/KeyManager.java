@@ -65,11 +65,11 @@ public class KeyManager {
 
     // If the salt is null, generate an IllegalArgumentException
     if(encKey == null){
-      throw new IllegalArgumentException("The encryption key cannot be null");
+      throw new NullPointerException("The encryption key cannot be null");
     }
     // If the salt is null, generate an IllegalArgumentException
     if(authKey == null){
-      throw new IllegalArgumentException("The authentication key cannot be null");
+      throw new NullPointerException("The authentication key cannot be null");
     }
 
     // Store wrapped keys

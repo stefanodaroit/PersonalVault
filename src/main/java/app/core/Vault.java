@@ -39,7 +39,7 @@ public class Vault {
    */
   public Vault(String storagePath, String psw, String empty) throws IOException, InternalException, InvalidPasswordException {
     if (storagePath == null || psw == null) {
-      throw new IllegalArgumentException("Invalid vault parameters");
+      throw new NullPointerException("Invalid vault parameters");
     }
     
     this.vid = UUID.randomUUID();
@@ -71,7 +71,7 @@ public class Vault {
    */
   public Vault(String vid, String storagePath) throws InvalidConfigurationException, IOException {
     if (storagePath == null || vid == null) {
-      throw new IllegalArgumentException("Invalid vault parameters");
+      throw new NullPointerException("Invalid vault parameters");
     }
     
     this.vid = UUID.fromString(vid);
@@ -138,7 +138,7 @@ public class Vault {
    */
   public void changePsw(String oldPsw, String newPsw) throws WrongPasswordException, InternalException, IOException, InvalidPasswordException {
     if (oldPsw == null || newPsw == null) {
-      throw new IllegalArgumentException("Invalid passwords");
+      throw new NullPointerException("Invalid passwords");
     }
     
     try {

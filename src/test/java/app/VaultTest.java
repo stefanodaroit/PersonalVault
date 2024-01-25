@@ -134,25 +134,25 @@ public class VaultTest extends TestCase{
   }
 
   @Test
-  public void testIllegalArgument() throws Exception {
+  public void testNullArgument() throws Exception {
     try {
       new Vault(null, PSW, null);
-      Assert.fail("IllegalArgumentException not thrown");
-    } catch (IllegalArgumentException e) {}
+      Assert.fail("NullPointerException not thrown");
+    } catch (NullPointerException e) {}
     
     try {
       new Vault(PATH, null, null);
-      Assert.fail("IllegalArgumentException not thrown");
-    } catch (IllegalArgumentException e) {}
+      Assert.fail("NullPointerException not thrown");
+    } catch (NullPointerException e) {}
 
     try {
       new Vault("0", null);
-      Assert.fail("IllegalArgumentException not thrown");
-    } catch (IllegalArgumentException e) {}
+      Assert.fail("NullPointerException not thrown");
+    } catch (NullPointerException e) {}
     try {
       new Vault(null, PATH);
-      Assert.fail("IllegalArgumentException not thrown");
-    } catch (IllegalArgumentException e) {}
+      Assert.fail("NullPointerException not thrown");
+    } catch (NullPointerException e) {}
   }
 
   @Test
@@ -169,6 +169,8 @@ public class VaultTest extends TestCase{
       new Vault(v.getVid().toString(), invalidPath);
       Assert.fail("IOException not thrown");
     } catch (IOException e) {}
+
+    deleteConfig(v);
   }
 
   @Test
