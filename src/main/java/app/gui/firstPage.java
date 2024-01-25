@@ -31,8 +31,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
-import javafx.collections.ObservableList;
-import javafx.collections.FXCollections;
 
 public class firstPage extends Application {
 
