@@ -1,5 +1,6 @@
 package app.gui;
 
+import java.io.*;
 import javafx.application.Application;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -30,6 +31,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
 public class firstPage extends Application {
@@ -94,39 +96,26 @@ public class firstPage extends Application {
     addNewVaultButton.setOnAction(new EventHandler<ActionEvent>() {
       @Override
       public void handle(ActionEvent event) {
-          // Create a new stage for the new "page"
-          final Stage newStage = new Stage();
-
-          // Create content for the new page
-          VBox newPageLayout = new VBox();
-          newPageLayout.setSpacing(10);
-          newPageLayout.setAlignment(Pos.CENTER);
-
-          Label newPageLabel = new Label("New Page Content");
-          Button closeButton = new Button("Close");
-
-          // Close the new page on button click
-          closeButton.setOnAction(new EventHandler<ActionEvent>() {
-              @Override
-              public void handle(ActionEvent closeEvent) {
-                  newStage.close();
-              }
-          });
-
-          // Add content to the new page layout
-          newPageLayout.getChildren().addAll(newPageLabel, closeButton);
-
-          // Set the new scene for the new stage
-          Scene newPageScene = new Scene(newPageLayout, 300, 200);
-          newStage.setScene(newPageScene);
-
-          // Show the new stage
-          newStage.show();
+          new addNewPage();
       }
   });
 
 
     primaryStage.show();
   }
+
+  private void chooseStorageLocation(Stage primaryStage) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Choose Storage Location");
+
+        // Show the directory chooser dialog
+        File selectedDirectory = directoryChooser.showDialog(primaryStage);
+
+        if (selectedDirectory != null) {
+            System.out.println("Selected Storage Location: " + selectedDirectory.getAbsolutePath());
+        } else {
+            System.out.println("No storage location selected.");
+        }
+    }
 
 }
