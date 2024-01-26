@@ -34,7 +34,7 @@ import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
-public class firstPage extends Application {
+public class FirstPage extends Application {
 
   public final int SCENE_WIDTH = 600;
   public final int SCENE_HEIGHT = 400;
@@ -96,26 +96,12 @@ public class firstPage extends Application {
     addNewVaultButton.setOnAction(new EventHandler<ActionEvent>() {
       @Override
       public void handle(ActionEvent event) {
-          new addNewPage();
+          AddNewPage.addNewPage();
       }
   });
 
 
     primaryStage.show();
   }
-
-  private void chooseStorageLocation(Stage primaryStage) {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Choose Storage Location");
-
-        // Show the directory chooser dialog
-        File selectedDirectory = directoryChooser.showDialog(primaryStage);
-
-        if (selectedDirectory != null) {
-            System.out.println("Selected Storage Location: " + selectedDirectory.getAbsolutePath());
-        } else {
-            System.out.println("No storage location selected.");
-        }
-    }
 
 }

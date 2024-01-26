@@ -217,39 +217,44 @@ public class KeyDerivator {
     Matcher hasDigit = digit.matcher(password);
     Matcher hasSpecial = special.matcher(password);
 
+    String message = null;
+
     // If the password is too short, generate an InvalidPasswordException
     if (password.length() < MIN_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("The password must contain at least " + MIN_PASSWORD_LENGTH + " characters");    
-    }
+      message = "The password must contain at least " + MIN_PASSWORD_LENGTH + " characters \n";    
+    } 
 
     // If the password is too long, generate an InvalidPasswordException
-    else if (password.length() > MAX_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("The password must contain a maximum of " + MAX_PASSWORD_LENGTH + " characters");   
-    }
+    if (password.length() > MAX_PASSWORD_LENGTH) {
+      message = message + "The password must contain a maximum of " + MAX_PASSWORD_LENGTH + " characters \n";   
+    } 
 
     // If the password has not a special character, generate an InvalidPasswordException
-    else if (!hasSpecial.find()) {
-      throw new InvalidPasswordException("The password must contain at least one special character");  
+    if (!hasSpecial.find()) {
+      message = message + "The password must contain at least one special character \n";  
     }
 
     // If the password has not an upper case character, generate an InvalidPasswordException
-    else if (!hasUpperCase.find()) {
-      throw new InvalidPasswordException("The password must contain at least one upper case character");
-    }
+    if (!hasUpperCase.find()) {
+      message = message + "The password must contain at least one upper case character \n";
+    } 
 
     // If the password has not a number, generate an InvalidPasswordException
-    else if (!hasDigit.find()) {
-      throw new InvalidPasswordException("The password must contain at least one number");  
-    }
+    if (!hasDigit.find()) {
+      message = message + "The password must contain at least one number\n";  
+    } 
 
     // If the password has not a lower case character, generate an InvalidPasswordException
-    else if (!hasLowerCase.find()) {
-      throw new InvalidPasswordException("The password must contain at least one lower case character");  
+    if (!hasLowerCase.find()) {
+      message = message + "The password must contain at least one lower case character\n";  
     }
-
     // If the password is in the list of weak passwords, generate an InvalidPasswordException
-    else if(weakPasswords.contains(password) ? true : false){
-      throw new InvalidPasswordException("The password must not be in the list of weak passwords");  
+    if(weakPasswords.contains(password) ? true : false){
+      message = message + "The password must not be in the list of weak passwords\n";  
+    } 
+
+    if(message !=null){
+      throw new InvalidPasswordException(message);
     }
   }
 
