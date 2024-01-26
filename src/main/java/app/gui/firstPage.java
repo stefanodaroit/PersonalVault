@@ -1,23 +1,15 @@
 package app.gui;
 
-import java.io.*;
+import app.core.Vault;
 import javafx.application.Application;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.Border;
@@ -27,20 +19,27 @@ import javafx.scene.layout.BorderStrokeStyle;
 import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.stage.DirectoryChooser;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
+
+
+import java.util.*;
+
+
 
 public class FirstPage extends Application {
 
-  public final int SCENE_WIDTH = 600;
-  public final int SCENE_HEIGHT = 400;
+  public final static int SCENE_WIDTH = 1800;
+  public final int SCENE_HEIGHT = 900;
+
+  static BorderPane borderPane = new BorderPane();
+  static List<Button> newVaults = new ArrayList<>();
 
   @Override
   public void start(Stage primaryStage) {
+
     // Create buttons
     Button settingsButton = new Button("Settings");
     Button addNewVaultButton = new Button("Add New Vault");
@@ -79,7 +78,6 @@ public class FirstPage extends Application {
 
 
     // Create the main layout
-    BorderPane borderPane = new BorderPane();
     borderPane.setTop(topPanel);
     borderPane.setLeft(leftPanel);
     borderPane.setRight(rightPanel);
@@ -98,10 +96,27 @@ public class FirstPage extends Application {
       public void handle(ActionEvent event) {
           AddNewPage.addNewPage();
       }
-  });
-
+    });
 
     primaryStage.show();
+
+    Rectangle2D primScreenBounds = Screen.getPrimary().getVisualBounds();
+    primaryStage.setX((primScreenBounds.getWidth() - primaryStage.getWidth()) / 2);
+    primaryStage.setY((primScreenBounds.getHeight() - primaryStage.getHeight()) / 2);
+  }
+
+  public static void addNewVault(Vault newVault, String name){
+
+    Button vault = new Button(name + "\n" + newVault.getStoragePath());
+    vault.setWrapText(true);
+    vault.setMaxWidth(SCENE_WIDTH * 0.4);
+
+    newVaults.add(vault);
+
+    VBox vaultButtons = new VBox(10);
+    vaultButtons.getChildren().addAll(newVaults);
+    
+    borderPane.setLeft(vaultButtons);
   }
 
 }

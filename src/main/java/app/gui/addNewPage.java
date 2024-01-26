@@ -3,6 +3,8 @@ package app.gui;
 import java.io.*;
 
 import app.core.KeyDerivator;
+import app.core.Vault;
+import app.core.Vault.InternalException;
 import app.core.KeyDerivator.InvalidPasswordException;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -33,6 +35,8 @@ public class AddNewPage extends Stage{
 
     private static String vaultName = "";
     private static String storagePath = "";
+
+    static Vault newVault = null;
     
     public static void addNewPage(){
         // Create a new stage for the new "page"
@@ -123,6 +127,7 @@ public class AddNewPage extends Stage{
                     storagePath = "";
                 }
             }
+
         });
 
         // Create a button for navigating back to the name input page
@@ -139,7 +144,6 @@ public class AddNewPage extends Stage{
                 }
             }
         });
-
 
         // Create a layout and add the "Choose Storage Location" and "Previous" buttons
         VBox layout = new VBox(10);
@@ -194,14 +198,13 @@ public class AddNewPage extends Stage{
                 } catch (InvalidPasswordException e) {
                     message = e.getMessage();
                 }
-
+                
                 for(int i=0; i < statusPsw.length; i++){
                     if(!message.contains(statusPsw[i].getText()))
                         statusPsw[i].setTextFill(Color.GREEN);
                     else
                         statusPsw[i].setTextFill(Color.RED);
                 }
-                
             }
         });
 
@@ -219,17 +222,43 @@ public class AddNewPage extends Stage{
         nextPageButton.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
-                if(passwordField.getText().equals(passwordFieldRe.getText())){
-                    Alert alert = new Alert(AlertType.CONFIRMATION, "Added Vault", ButtonType.OK);
-                    alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-                    alert.show();
-                    primaryStage.close();
-                } else{
-                    Alert alert = new Alert(AlertType.INFORMATION, "Password must be equals", ButtonType.OK);
+                try{
+                    KeyDerivator kd = new KeyDerivator();
+                    kd.validatePassword(passwordField.getText());
+
+                    if(passwordField.getText().equals(passwordFieldRe.getText())){
+                    
+                        Alert alert = new Alert(AlertType.CONFIRMATION, "Added Vault", ButtonType.OK);
+                        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+                        alert.show();
+    
+                        primaryStage.close();
+    
+                        try {
+                            newVault = new Vault(storagePath, passwordField.getText());
+                            FirstPage.addNewVault(newVault, vaultName);
+                        } catch (IOException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        } catch (InternalException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        } catch (InvalidPasswordException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                        
+                    } else{
+                        Alert alert = new Alert(AlertType.INFORMATION, "Password must be equals", ButtonType.OK);
+                        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+                        alert.show();
+                    }
+                    
+                } catch (InvalidPasswordException e) {
+                    Alert alert = new Alert(AlertType.WARNING, e.getMessage(), ButtonType.OK);
                     alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
                     alert.show();
                 }
-                
             }
         });
 
@@ -260,6 +289,5 @@ public class AddNewPage extends Stage{
 
         // Show the new stage
         primaryStage.show();
-        
     }
 }
