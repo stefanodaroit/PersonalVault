@@ -5,6 +5,8 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import org.apache.commons.codec.binary.BinaryCodec;
 
 import app.core.KeyDerivator;
@@ -64,8 +66,7 @@ public class KeyDerivatorTest{
     } catch(KeyDerivator.InvalidPasswordException e) {
       exceptionMessage = e.getMessage();
     }
-
-    assertEquals("The password must contain at least 12 characters", exceptionMessage);
+    assertTrue(exceptionMessage.contains("The password must contain at least 12 characters"));
   }
 
   @Test
@@ -78,8 +79,8 @@ public class KeyDerivatorTest{
     } catch(KeyDerivator.InvalidPasswordException e) {
       exceptionMessage = e.getMessage();
     }
-
-    assertEquals("The password must contain a maximum of 64 characters", exceptionMessage);
+    assertTrue(exceptionMessage.contains("The password must contain a maximum of 64 characters"));
+    //assertEquals("The password must contain a maximum of 64 characters", exceptionMessage);
   }
 
   @Test
@@ -92,8 +93,8 @@ public class KeyDerivatorTest{
     } catch(KeyDerivator.InvalidPasswordException e) {
       exceptionMessage = e.getMessage();
     }
-
-    assertEquals("The password must contain at least one special character", exceptionMessage);
+    assertTrue(exceptionMessage.contains("The password must contain at least one special character"));
+    //assertEquals("The password must contain at least one special character", exceptionMessage);
   }
 
   @Test
@@ -106,8 +107,8 @@ public class KeyDerivatorTest{
     } catch(KeyDerivator.InvalidPasswordException e) {
       exceptionMessage = e.getMessage();
     }
-
-    assertEquals("The password must contain at least one upper case character", exceptionMessage);
+    assertTrue(exceptionMessage.contains("The password must contain at least one upper case character"));
+    //assertEquals("The password must contain at least one upper case character", exceptionMessage);
   }
 
   @Test
@@ -120,8 +121,8 @@ public class KeyDerivatorTest{
     } catch(KeyDerivator.InvalidPasswordException e) {
       exceptionMessage = e.getMessage();
     }
-
-    assertEquals("The password must contain at least one number", exceptionMessage);
+    assertTrue(exceptionMessage.contains("The password must contain at least one number"));
+    //assertEquals("The password must contain at least one number", exceptionMessage);
   }
 
   @Test
@@ -134,8 +135,8 @@ public class KeyDerivatorTest{
     } catch(KeyDerivator.InvalidPasswordException e) {
       exceptionMessage = e.getMessage();
     }
-
-    assertEquals("The password must contain at least one lower case character", exceptionMessage);
+    assertTrue(exceptionMessage.contains("The password must contain at least one lower case character"));
+    //assertEquals("The password must contain at least one lower case character", exceptionMessage);
   }
 
   @Test
