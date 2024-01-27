@@ -35,9 +35,7 @@ public class AddNewPage extends Stage{
 
     private static String vaultName = "";
     private static String storagePath = "";
-
-    static Vault newVault = null;
-    
+  
     public static void addNewPage(){
         // Create a new stage for the new "page"
         primaryStage = new Stage();
@@ -235,17 +233,18 @@ public class AddNewPage extends Stage{
                         primaryStage.close();
     
                         try {
-                            newVault = new Vault(storagePath, passwordField.getText());
-                            FirstPage.addNewVault(newVault, vaultName);
+                            final Vault newVault = new Vault(storagePath, passwordField.getText());
+                            newVault.setName(vaultName);
+                            FirstPage.addNewVault(newVault);
                         } catch (IOException e) {
                             // TODO Auto-generated catch block
-                            e.printStackTrace();
+                            e.getMessage();
                         } catch (InternalException e) {
                             // TODO Auto-generated catch block
-                            e.printStackTrace();
+                            e.getMessage();
                         } catch (InvalidPasswordException e) {
                             // TODO Auto-generated catch block
-                            e.printStackTrace();
+                            e.getMessage();
                         }
                         
                     } else{

@@ -28,6 +28,8 @@ public class Vault {
 
   private KeyManager km;
   
+  private String name;
+  
   /**
    * Create a new vault in "path" using "password" for keys derivation
    * @param storagePath  The path in which store the vault
@@ -323,6 +325,14 @@ public class Vault {
 
   public String getStoragePath() {
     return this.storagePath;
+  }
+
+  public void setName(String name){
+    this.name = name;
+  }
+
+  public String getName(){
+    return this.name;
   }
 
   public VaultConfiguration getVaultConfiguration() {
