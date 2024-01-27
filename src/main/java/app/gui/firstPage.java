@@ -246,13 +246,12 @@ public class FirstPage extends Application {
                 Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
                 alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
                 alert.show();
-                e.printStackTrace();
               } catch (InternalException e) {
                 // TODO Auto-generated catch block
-                e.printStackTrace();
+                e.getMessage();
               } catch (IOException e) {
                 // TODO Auto-generated catch block
-                e.printStackTrace();
+                e.getMessage();
               }
               
             } else {
