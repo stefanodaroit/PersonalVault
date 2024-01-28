@@ -2,10 +2,13 @@ package app.core;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.UUID;
 
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -13,37 +16,42 @@ import javax.crypto.SecretKey;
 import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.KeyDerivator.InvalidSaltException;
 
-import java.util.UUID;
-
 import static app.core.Constants.*;
 
 public class Vault {
 
-  private UUID vid;
-
-  private String storagePath;
-  private VaultConfiguration conf;
+  private final UUID vid;
+  private String name;
+  private Path storagePath;
+  
   private byte[] confMac;
+  private boolean locked = true;
 
   private KeyManager km;
+  private VaultConfiguration conf;
   
   /**
    * Create a new vault in "path" using "password" for keys derivation
+   * @param name         The name of the vault (can be null); if null name = vid
    * @param storagePath  The path in which store the vault
    * @param psw          The password used for key derivation
-   * @param empty        Set to null
    * 
    * @throws IOException
    * @throws InternalException
    * @throws InvalidPasswordException
    */
-  public Vault(String storagePath, String psw, String empty) throws IOException, InternalException, InvalidPasswordException {
+  public Vault(String name, String storagePath, String psw) throws IOException, InternalException, InvalidPasswordException {
     if (storagePath == null || psw == null) {
-      throw new NullPointerException("Invalid vault parameters");
+      throw new NullPointerException("Null vault parameter");
+    }
+
+    if (!name.matches("^[a-zA-Z0-9_ ]+$")) {
+      throw new IllegalArgumentException("Invalid vault name");
     }
     
     this.vid = UUID.randomUUID();
-    this.storagePath = storagePath;
+    this.name = name != null ? name : this.vid.toString();
+    this.locked = false;
     
     try {
       // Create and wrap secret keys
@@ -54,6 +62,9 @@ public class Vault {
     } catch (Exception e) {
       throw new InternalException();
     }
+
+    this.storagePath = Paths.get(storagePath, name);
+    Files.createDirectory(this.storagePath);
     
     // Create and save vault configuration
     this.conf = new VaultConfiguration(this.vid, this.km.getSalt(), this.km.getWrapEncKey(), this.km.getWrapAuthKey());
@@ -63,19 +74,25 @@ public class Vault {
   /**
    * Import an existing vault
    * 
-   * @param vid int: vault ID
-   * @param storagePath String: vault storage path
+   * @param vid         vault id
+   * @param name        vault name; if null name = vid
+   * @param storagePath vault storage path
    * 
    * @throws InvalidConfigurationException
    * @throws IOException
    */
-  public Vault(String vid, String storagePath) throws InvalidConfigurationException, IOException {
+  public Vault(UUID vid, String name, String storagePath) throws InvalidConfigurationException, IOException {
     if (storagePath == null || vid == null) {
       throw new NullPointerException("Invalid vault parameters");
     }
+
+    if (!name.matches("^[a-zA-Z0-9_]+$")) {
+      throw new IllegalArgumentException("Invalid vault name");
+    }
     
-    this.vid = UUID.fromString(vid);
-    this.storagePath = storagePath;
+    this.vid = vid;
+    this.name = name != null ? name : this.vid.toString();
+    this.storagePath = Paths.get(storagePath, name);
     
     try {
       // Read vault configuration and init key manager
@@ -86,8 +103,71 @@ public class Vault {
     }
   }
 
-  public void lock() {}
-  
+  /**
+   * Add the directory and its content to the vault including all subdirectories
+   * 
+   * @param path The directory path
+   * 
+   * @throws IOException If something in the copy does not work
+   * @throws VaultLockedException If the vault is still locked 
+   */
+  public void addDirectory(String path) throws IOException, VaultLockedException {
+    if (path == null) {
+      throw new NullPointerException("Path cannot be null");
+    }
+
+    // Loop over the directory content
+    Files.walk(Paths.get(path)).forEach(source -> {
+      try {
+        // Copy file considering the subdirectories
+        addFile(source, source.subpath(this.storagePath.getNameCount() - 1, source.getNameCount()));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+  }
+
+  /**
+   * Add the file to the vault
+   * 
+   * @param path The directory path
+   * 
+   * @throws IOException If something in the copy does not work
+   * @throws VaultLockedException If the vault is still locked 
+   */
+  public void addFile(String path) throws IOException, VaultLockedException {
+    if (path == null) {
+      throw new NullPointerException("Path cannot be null");
+    }
+    // Copy file directly in the vault (without subdirectories)
+    addFile(Paths.get(path), null);
+  }
+
+  /**
+   * Copy file in srcPath to storagePath/destPath; if destPath is null copies to storagePath/srcFilename
+   * 
+   * @param srcPath The source file path
+   * @param dstPath The destination path
+   * 
+   * @throws IOException If something in the copy does not work
+   * @throws VaultLockedException If the vault is still locked 
+   */
+  private void addFile(Path srcPath, Path dstPath) throws IOException, VaultLockedException {
+    if (srcPath == null) {
+      throw new NullPointerException("Path cannot be null");
+    }
+
+    if (this.locked) {
+      throw new VaultLockedException();
+    }
+    
+    // Copy file; if no subdirectories are included use the filename
+    Path dst = this.storagePath.resolve(dstPath == null ? srcPath.getFileName() : dstPath);
+    Files.copy(srcPath, dst, StandardCopyOption.COPY_ATTRIBUTES);
+
+    // TODO add encryption part
+  }
+
   /**
    * Unlock the files in the vault
    * 
@@ -123,6 +203,8 @@ public class Vault {
       System.out.println("Error while checking configuration integrity");
       throw new InvalidConfigurationException();
     }
+
+    this.locked = false;
   }
 
   /**
@@ -177,7 +259,7 @@ public class Vault {
     
     try {
       // Read and decode token from the vault root
-      byte[] token = Files.readAllBytes(Paths.get(VaultConfiguration.getPath(this.storagePath, this.vid)));
+      byte[] token = Files.readAllBytes(VaultConfiguration.getPath(this.storagePath, this.vid));
       byte[] serializedConf = decodeToken(token); 
       
       // Deserialize VaultConfiguration object
@@ -208,7 +290,7 @@ public class Vault {
       
       // Generate a token with MAC and save it in the vault root
       byte[] token = encodeSignedToken(serializedConf);
-      Files.write(Paths.get(VaultConfiguration.getPath(this.storagePath, this.vid)), token);
+      Files.write(VaultConfiguration.getPath(this.storagePath, this.vid), token);
     } catch (IOException e) {
       System.out.println("Error while saving configuration file");
       throw e;
@@ -325,8 +407,12 @@ public class Vault {
     return this.vid;
   }
 
+  public String getName() {
+    return this.name;
+  }
+
   public String getStoragePath() {
-    return this.storagePath;
+    return this.storagePath.toString();
   }
 
   public VaultConfiguration getVaultConfiguration() {
@@ -348,6 +434,12 @@ public class Vault {
   public static class WrongPasswordException extends Exception { 
     public WrongPasswordException() { 
       super("The password is wrong"); 
+    }
+  }
+
+  public static class VaultLockedException extends Exception { 
+    public VaultLockedException() { 
+      super("Cannot modify the vault - Vault Locked!"); 
     }
   }
   

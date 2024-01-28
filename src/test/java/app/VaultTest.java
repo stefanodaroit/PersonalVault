@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.UUID;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -22,6 +23,7 @@ public class VaultTest extends TestCase{
   private Vault v;
   private final String PSW = "SecretP@ssword1234";
   private final String PATH = ".";
+  private final String NAME = "Vault";
 
   public static void swap(byte[] array, int idx1, int idx2) {
     if (array[idx1] == array[idx2]) {
@@ -36,23 +38,28 @@ public class VaultTest extends TestCase{
     array[idx2] = tmp;
   }
 
-  public static void deleteConfig(Vault v) {
+  public static void deleteConfig(Vault v) throws IOException {
     if (v == null) { return; }
     
-    File conf = new File(VaultConfiguration.getPath(v.getStoragePath(), v.getVid())); 
-    if (conf != null) { conf.delete(); }
+    File vaultDir = new File(v.getStoragePath()); 
+    if (vaultDir != null) { 
+      Files.walk(Paths.get(v.getStoragePath()))
+      .map(Path::toFile)
+      .forEach(File::delete);
+      vaultDir.delete(); 
+    }
   }
 
   @Test
   public void testCreateVault() throws Exception {
-    v = new Vault(PATH, PSW, null);
+    v = new Vault(NAME, PATH, PSW);
     assertNotNull(v);
     deleteConfig(v);
   }
 
   @Test
   public void testImportVault() throws Exception {
-    v = new Vault(new Vault(PATH, PSW, null).getVid().toString(), PATH);
+    v = new Vault(new Vault(NAME, PATH, PSW).getVid(), NAME, PATH);
     assertNotNull(v);
     deleteConfig(v);
   }
@@ -62,16 +69,16 @@ public class VaultTest extends TestCase{
     final char PERIOD = '.';
 
     try {
-      v = new Vault(PATH, PSW, null);
+      v = new Vault(NAME, PATH, PSW);
 
       // Tamper header
-      Path path = Paths.get(VaultConfiguration.getPath(v.getStoragePath(), v.getVid()));
+      Path path = VaultConfiguration.getPath(v.getStoragePath(), v.getVid());
       byte[] token = Files.readAllBytes(path);
       token = Arrays.copyOfRange(token, new String(token).indexOf(PERIOD), token.length);
       Files.write(path, token);
 
       // Import vault
-      v = new Vault(v.getVid().toString(), PATH);
+      v = new Vault(v.getVid(), NAME, PATH);
       
       Assert.fail("InvalidConfigurationException not thrown");
     } catch (InvalidConfigurationException e) {
@@ -79,16 +86,16 @@ public class VaultTest extends TestCase{
     }
 
     try {
-      v = new Vault(PATH, PSW, null);
+      v = new Vault(NAME, PATH, PSW);
 
       // Tamper header
-      Path path = Paths.get(VaultConfiguration.getPath(v.getStoragePath(), v.getVid()));
+      Path path = VaultConfiguration.getPath(v.getStoragePath(), v.getVid());
       byte[] token = Files.readAllBytes(path);
       swap(token, 0, 1);
       Files.write(path, token);
 
       // Import vault
-      v = new Vault(v.getVid().toString(), PATH);
+      v = new Vault(v.getVid(), NAME, PATH);
       
       Assert.fail("InvalidConfigurationException not thrown");
     } catch (InvalidConfigurationException e) {
@@ -96,17 +103,17 @@ public class VaultTest extends TestCase{
     }
 
     try {
-      v = new Vault(PATH, PSW, null);
+      v = new Vault(NAME, PATH, PSW);
 
       // Tamper serialization
-      Path path = Paths.get(VaultConfiguration.getPath(v.getStoragePath(), v.getVid()));
+      Path path = VaultConfiguration.getPath(v.getStoragePath(), v.getVid());
       byte[] token = Files.readAllBytes(path);
       int idx = new String(token).indexOf(PERIOD);
       swap(token, idx + 1, idx + 2);
       Files.write(path, token);
 
       // Import vault
-      v = new Vault(v.getVid().toString(), PATH);
+      v = new Vault(v.getVid(), NAME, PATH);
       
       Assert.fail("IOException not thrown");
     } catch (IOException e) {
@@ -114,17 +121,17 @@ public class VaultTest extends TestCase{
     }
     
     try {
-      v = new Vault(PATH, PSW, null);
+      v = new Vault(NAME, PATH, PSW);
 
       // Tamper HMAC
-      Path path = Paths.get(VaultConfiguration.getPath(v.getStoragePath(), v.getVid()));
+      Path path = VaultConfiguration.getPath(v.getStoragePath(), v.getVid());
       byte[] token = Files.readAllBytes(path);
       int idx = new String(token).lastIndexOf(PERIOD);
       swap(token, idx + 1, idx + 2);
       Files.write(path, token);
 
       // Import vault and unlock
-      v = new Vault(v.getVid().toString(), PATH);
+      v = new Vault(v.getVid(), NAME, PATH);
       v.unlock(PSW);
       
       Assert.fail("InvalidConfigurationException not thrown");
@@ -136,21 +143,22 @@ public class VaultTest extends TestCase{
   @Test
   public void testNullArgument() throws Exception {
     try {
-      new Vault(null, PSW, null);
+      new Vault(NAME, null, PSW);
       Assert.fail("NullPointerException not thrown");
     } catch (NullPointerException e) {}
     
     try {
-      new Vault(PATH, null, null);
+      new Vault(NAME, PATH, null);
       Assert.fail("NullPointerException not thrown");
     } catch (NullPointerException e) {}
 
     try {
-      new Vault("0", null);
+      new Vault(v.getVid(), NAME, null);
       Assert.fail("NullPointerException not thrown");
     } catch (NullPointerException e) {}
     try {
-      new Vault(null, PATH);
+      UUID vid = null;
+      new Vault(vid, NAME, PATH);
       Assert.fail("NullPointerException not thrown");
     } catch (NullPointerException e) {}
   }
@@ -158,15 +166,15 @@ public class VaultTest extends TestCase{
   @Test
   public void testInvalidPath() throws Exception {
     final String invalidPath = "/home/app/";
-    v = new Vault(PATH, PSW, null);
+    v = new Vault(NAME, PATH, PSW);
     
     try {
-      new Vault(invalidPath, PSW, null);
+      new Vault(NAME, invalidPath, PSW);
       Assert.fail("IOException not thrown");
     } catch (IOException e) {}
 
     try {
-      new Vault(v.getVid().toString(), invalidPath);
+      new Vault(v.getVid(), NAME, invalidPath);
       Assert.fail("IOException not thrown");
     } catch (IOException e) {}
 
@@ -176,7 +184,7 @@ public class VaultTest extends TestCase{
   @Test
   public void testInvalidPsw() throws Exception {    
     try {
-      new Vault(PATH, "password", null);
+      new Vault(NAME, PATH, "password");
       Assert.fail("InvalidPasswordException not thrown");
     } catch (InvalidPasswordException e) {}
   }
@@ -184,7 +192,7 @@ public class VaultTest extends TestCase{
   @Test
   public void testWrongPsw() throws Exception {   
     try {
-      v = new Vault(PATH, PSW, null);
+      v = new Vault(NAME, PATH, PSW);
       v.unlock(PSW + "!");
       Assert.fail("WrongPasswordException not thrown");
     } catch (WrongPasswordException e) {
@@ -194,7 +202,7 @@ public class VaultTest extends TestCase{
 
   @Test
   public void testChangePsw() throws Exception {   
-    v = new Vault(PATH, PSW, null);
+    v = new Vault(NAME, PATH, PSW);
 
     // Wrong old password
     try {
@@ -212,7 +220,7 @@ public class VaultTest extends TestCase{
     v.changePsw(PSW, PSW + "!");
 
     // Import and change psw
-    v = new Vault(v.getVid().toString(), PATH);
+    v = new Vault(v.getVid(), NAME, PATH);
     v.changePsw(PSW + "!", PSW + "!!");
       
     deleteConfig(v);

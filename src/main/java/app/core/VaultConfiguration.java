@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 
 public class VaultConfiguration implements Serializable {
@@ -58,8 +60,12 @@ public class VaultConfiguration implements Serializable {
     "}";
   }
 
-  public static String getPath(String path, UUID vid) {
-    return path + "/" + vid.toString() + "-config.vault";
+  public static Path getPath(Path path, UUID vid) {
+    return path.resolve(vid.toString() + ".vault");
+  }
+
+  public static Path getPath(String path, UUID vid) {
+    return Paths.get(path, vid.toString() + ".vault");
   }
 
   public static byte[] serialize(VaultConfiguration conf) throws IOException {
