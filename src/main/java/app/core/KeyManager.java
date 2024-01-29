@@ -56,7 +56,7 @@ public class KeyManager {
    * 
    * @param encKey byte[]  stored encryption key
    * @param authKey byte[]  stored authentication key
-   * @throws InvalidSaltException if the salt is not 128 byte length
+   * @throws InvalidSaltException if the salt is not 128 bits length
    */
   public KeyManager(byte[] encKey, byte[] authKey, byte[] salt) throws InvalidSaltException{
 
@@ -65,11 +65,11 @@ public class KeyManager {
 
     // If the salt is null, generate an IllegalArgumentException
     if(encKey == null){
-      throw new IllegalArgumentException("The encryption key cannot be null");
+      throw new NullPointerException("The encryption key cannot be null");
     }
     // If the salt is null, generate an IllegalArgumentException
     if(authKey == null){
-      throw new IllegalArgumentException("The authentication key cannot be null");
+      throw new NullPointerException("The authentication key cannot be null");
     }
 
     // Store wrapped keys

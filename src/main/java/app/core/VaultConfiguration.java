@@ -6,17 +6,20 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
 
 public class VaultConfiguration implements Serializable {
   
-  private final int vid;    // Vault ID
+  private final String vid;    // Vault ID
   
   private byte[] salt;      // Salt used for key derivation
   private byte[] encKey;    // Encrypted symmetric key for files' header
   private byte[] authKey;   // Encrypted symmetric key for HMAC
   
-  public VaultConfiguration(int vid, byte[] salt, byte[] encKey, byte[] authKey) {
-    this.vid = vid;
+  public VaultConfiguration(UUID vid, byte[] salt, byte[] encKey, byte[] authKey) {
+    this.vid = vid.toString();
     this.salt = salt;
     this.encKey = encKey;
     this.authKey = authKey;
@@ -57,8 +60,12 @@ public class VaultConfiguration implements Serializable {
     "}";
   }
 
-  public static String getPath(String path, int vid) {
-    return path + "/" + vid + "-config.vault";
+  public static Path getPath(Path path, UUID vid) {
+    return path.resolve(vid.toString() + ".vault");
+  }
+
+  public static Path getPath(String path, UUID vid) {
+    return Paths.get(path, vid.toString() + ".vault");
   }
 
   public static byte[] serialize(VaultConfiguration conf) throws IOException {

@@ -1,15 +1,18 @@
 package app;
 
-import java.io.IOException;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.junit.Assert;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
-import org.apache.commons.codec.binary.BinaryCodec;
+
+import java.security.SecureRandom;
+import java.util.Random;
 
 import app.core.KeyDerivator;
 import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.KeyDerivator.InvalidSaltException;
+import static app.core.Constants.SALT_LENGTH;
 
 /**
  * Unit test for KeyDerivator class
@@ -17,157 +20,106 @@ import app.core.KeyDerivator.InvalidSaltException;
 public class KeyDerivatorTest{
 
   private KeyDerivator kd = new KeyDerivator();
+  private Random gen = new SecureRandom();
   
   @Test
-  public void testCorrectPsw() throws InvalidPasswordException
-  {   
-    String password = "dhfmn284BBB'''13.";
+  public void testCorrectPsw() throws Exception {   
+    String password = "SecretP@ssword1234";
     kd.setPsw(password);
     byte[] hashedBytes = kd.getMasterKey();
-
     assertEquals(64, hashedBytes.length);
   }
 
   @Test
-  public void testNullPsw() throws InvalidPasswordException
-  {   
-    String exceptionMessage = "";
+  public void testNullPsw() throws Exception {   
     try {
       kd.setPsw(null);
-    } catch(IllegalArgumentException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password cannot be null", exceptionMessage);
+      Assert.fail("NullPointerException not thrown");
+    } catch(NullPointerException e) {}
   }
 
   @Test
-  public void testNullPswValidate() throws InvalidPasswordException
-  {   
-    String exceptionMessage = "";
+  public void testNullPswValidate() throws Exception {   
     try {
       kd.validatePassword(null);
-    } catch(IllegalArgumentException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password cannot be null", exceptionMessage);
+      Assert.fail("NullPointerException not thrown");
+    } catch(NullPointerException e) {}
   }
 
   @Test
-  public void testShortPws()
-  {     
-    String exceptionMessage = "";
+  public void testShortPsw() {     
     try {
-      String password = "d";
-      kd.validatePassword(password);;
-    } catch(KeyDerivator.InvalidPasswordException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password must contain at least 12 characters", exceptionMessage);
-  }
-
-  @Test
-  public void testLongPws()
-  {     
-    String exceptionMessage = "";
-    try {
-      String password = "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-      kd.validatePassword(password);;
-    } catch(KeyDerivator.InvalidPasswordException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password must contain a maximum of 64 characters", exceptionMessage);
-  }
-
-  @Test
-  public void testNoSpecialPws()
-  {     
-    String exceptionMessage = "";
-    try {
-      String password = "ffffffffffffffff";
+      String password = "P@ssword123"; 
       kd.validatePassword(password);
-    } catch(KeyDerivator.InvalidPasswordException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password must contain at least one special character", exceptionMessage);
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch(InvalidPasswordException e) {}
   }
 
   @Test
-  public void testNoUpperCasePws()
-  {     
-    String exceptionMessage = "";
+  public void testLongPsw() {     
     try {
-      String password = "ffffffffffffffff?";
+      String password = "SecretP@ssword1234fffffffffffffffffffffffffffffffffffffffffffffff";
       kd.validatePassword(password);
-    } catch(KeyDerivator.InvalidPasswordException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password must contain at least one upper case character", exceptionMessage);
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch(InvalidPasswordException e) {}
   }
 
   @Test
-  public void testNoDigitPws()
-  {     
-    String exceptionMessage = "";
+  public void testNoSpecialPsw() {
     try {
-      String password = "ffffffffffffffff?F";
+      String password = "SecretPassword1234";
       kd.validatePassword(password);
-    } catch(KeyDerivator.InvalidPasswordException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password must contain at least one number", exceptionMessage);
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch(InvalidPasswordException e) {}
   }
 
   @Test
-  public void testNoLowerCasePws()
-  {     
-    String exceptionMessage = "";
+  public void testNoUpperCasePsw() {     
     try {
-      String password = "FFFFFFFFFFFFF?1";
+      String password = "secretp@ssword1234";
       kd.validatePassword(password);
-    } catch(KeyDerivator.InvalidPasswordException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The password must contain at least one lower case character", exceptionMessage);
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch(InvalidPasswordException e) {}
   }
 
   @Test
-  public void testSalt() throws IOException
-  {     
-    String exceptionMessage = "";
+  public void testNoDigitPsw() {     
     try {
-      byte[] salt = new BinaryCodec().toByteArray("1000000111010000");
+      String password = "SecretP@ssword";
+      kd.validatePassword(password);
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch(InvalidPasswordException e) {}
+  }
+
+  @Test
+  public void testNoLowerCasePsw() {     
+    try {
+      String password = "SECRETP@SSWORD1234";
+      kd.validatePassword(password);
+      Assert.fail("InvalidPasswordException not thrown");
+    } catch(InvalidPasswordException e) {}
+  }
+
+  @Test
+  public void testSalt() throws Exception {     
+    try {
+      byte[] salt = new byte[SALT_LENGTH - 1];
+      gen.nextBytes(salt);
       kd = new KeyDerivator(salt);
-    } catch(KeyDerivator.InvalidSaltException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The salt must be 128 bytes long", exceptionMessage);
+      Assert.fail("InvalidSaltException not thrown");
+    } catch(InvalidSaltException e) {}
   }
 
   @Test
-  public void testSaltNull() throws IOException, InvalidSaltException
-  {     
-    String exceptionMessage = "";
+  public void testSaltNull() throws Exception {     
     try {
       kd = new KeyDerivator(null);
-    } catch(IllegalArgumentException e) {
-      exceptionMessage = e.getMessage();
-    }
-
-    assertEquals("The salt cannot be null", exceptionMessage);
+      Assert.fail("NullPointerException not thrown");
+    } catch(NullPointerException e) {}
   }
 
   @Test
-  public void testSameMasterKey() throws InvalidSaltException, InvalidPasswordException
-  {   
+  public void testSameMasterKey() throws Exception {   
     String password = "dhfmn284BBB'''13.";
     kd.setPsw(password);
     byte[] hashedBytes = kd.getMasterKey();
