@@ -29,7 +29,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
 
-public class AddNewPage extends Stage{
+public class NewVaultPopup extends Stage{
 
     private static Stage primaryStage;
 
@@ -232,20 +232,20 @@ public class AddNewPage extends Stage{
     
                         primaryStage.close();
     
-                        try {
-                            final Vault newVault = new Vault(storagePath, passwordField.getText());
-                            newVault.setName(vaultName);
-                            FirstPage.addNewVault(newVault);
-                        } catch (IOException e) {
-                            // TODO Auto-generated catch block
-                            e.getMessage();
-                        } catch (InternalException e) {
-                            // TODO Auto-generated catch block
-                            e.getMessage();
-                        } catch (InvalidPasswordException e) {
-                            // TODO Auto-generated catch block
-                            e.getMessage();
-                        }
+                        // try {
+                        //     final Vault newVault = new Vault(storagePath, passwordField.getText());
+                        //     newVault.setName(vaultName);
+                        //     PersonalVault.addNewVault(newVault);
+                        // } catch (IOException e) {
+                        //     // TODO Auto-generated catch block
+                        //     e.getMessage();
+                        // } catch (InternalException e) {
+                        //     // TODO Auto-generated catch block
+                        //     e.getMessage();
+                        // } catch (InvalidPasswordException e) {
+                        //     // TODO Auto-generated catch block
+                        //     e.getMessage();
+                        // }
                         
                     } else{
                         Alert alert = new Alert(AlertType.INFORMATION, "Password must be equals", ButtonType.OK);

@@ -6,6 +6,8 @@ import app.core.Vault;
 import app.core.Vault.InternalException;
 import app.core.Vault.InvalidConfigurationException;
 import app.core.Vault.WrongPasswordException;
+import static app.core.Constants.CONF_FILE_EXT;
+
 import javafx.application.Application;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -20,6 +22,8 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
@@ -33,95 +37,160 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 
 
-public class FirstPage extends Application {
+public class PersonalVault extends Application {
 
-  public final static int SCENE_WIDTH = 1800;
-  public final int SCENE_HEIGHT = 900;
-
+  private final static int WIDTH = 1000, HEIGHT = 700;
+  private final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
+  
+  private static ListView<Vault> listVaultView = new ListView<Vault>();
   static BorderPane borderPane = new BorderPane();
   static HashMap<Vault, Button> newVaults = new HashMap<Vault, Button>();
-  static VBox rightPart = new VBox();
+  static VBox rightPart = new VBox();  
 
   @Override
   public void start(Stage primaryStage) {
-
-    // Create buttons
-    Button settingsButton = new Button("Settings");
-    Button addNewVaultButton = new Button("Add New Vault");
-    Button addExVaultButton = new Button("Add Existing Vault");
-
-    Label title = new Label("PERSONAL VAULT");
-
-    // Create top layout with "Personal Vault" label and buttons
+    // Top panel
     HBox topPanel = new HBox();
-    topPanel.setPadding(new Insets(10, 10, 10, 10));
+    topPanel.setPrefSize(WIDTH, HEIGHT * 0.05);
+    topPanel.setAlignment(Pos.CENTER);
     topPanel.setBackground(new Background(new BackgroundFill(Color.LIGHTBLUE, CornerRadii.EMPTY, Insets.EMPTY)));
-    topPanel.getChildren().addAll(title, settingsButton);
-    HBox.setHgrow(title, javafx.scene.layout.Priority.ALWAYS);
-    title.setMaxWidth(Double.MAX_VALUE);
-
-
-    // Left panel
-    VBox leftPanel = new VBox();
-    leftPanel.setPadding(new Insets(10, 10, 10, SCENE_WIDTH * 0.4));
-    leftPanel.setBorder(new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));
+    
+    Label title = new Label("PERSONAL VAULT");
+    topPanel.getChildren().add(title);
   
-  
-    // Create right layout with some content
+    // Right panel
     VBox rightPanel = new VBox();
-    rightPanel.setPadding(new Insets(10, 10, 10, SCENE_WIDTH * 0.6));
-    rightPanel.setBorder(new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));
+    rightPanel.setPrefSize(WIDTH * 0.6, HEIGHT);
+    rightPanel.setBorder(BORDER);
 
-    // Create the bottom panel
+    // Bottom panel
     HBox bottomPanel = new HBox();
-    bottomPanel.setPadding(new Insets(10, 10, 10, 10));
-    bottomPanel.setSpacing(10);
     bottomPanel.setAlignment(Pos.CENTER);
+    bottomPanel.setSpacing(10);
+    bottomPanel.setPrefSize(WIDTH, HEIGHT * 0.05);
+    bottomPanel.getChildren().addAll(newVaultBtn(), importVaultBtn(primaryStage));
 
-    // Add content to the bottom panel
-    bottomPanel.getChildren().addAll(addNewVaultButton, addExVaultButton);
-
-
-    // Create the main layout
+    // Push the different panels in the main layout
     borderPane.setTop(topPanel);
-    borderPane.setLeft(leftPanel);
+    borderPane.setLeft(getVaultListBox());
     borderPane.setRight(rightPanel);
     borderPane.setBottom(bottomPanel);
-
-    // Create the scene
-    Scene scene = new Scene(borderPane, SCENE_WIDTH, SCENE_HEIGHT);
+    Scene scene = new Scene(borderPane);
 
     // Set up the stage
-    primaryStage.setTitle("Personal Vault App");
+    primaryStage.setTitle("Personal Vault");
     primaryStage.setScene(scene);
+    primaryStage.setResizable(false);
+    primaryStage.show();
 
-    // Handle bottomButton click event without lambda expression
-    addNewVaultButton.setOnAction(new EventHandler<ActionEvent>() {
-      @Override
-      public void handle(ActionEvent event) {
-          AddNewPage.addNewPage();
+    // Place the window at the center of the screen
+    Rectangle2D screen = Screen.getPrimary().getVisualBounds();
+    primaryStage.setX((screen.getWidth()  - primaryStage.getWidth())  / 2);
+    primaryStage.setY((screen.getHeight() - primaryStage.getHeight()) / 2);
+  }
+
+  /**
+   * Create the right box importing the vaults from a configuration file
+   */
+  public VBox getVaultListBox() {
+    final double CELLSIZE = 80.0;
+    
+    listVaultView = new ListView<Vault>();
+    listVaultView.setPrefWidth(WIDTH * 0.4);   
+    listVaultView.setPrefHeight(HEIGHT);   
+    listVaultView.setFixedCellSize(CELLSIZE); 
+    listVaultView.setCellFactory(cell -> {
+      return new ListCell<Vault>() {
+        @Override
+        protected void updateItem(Vault item, boolean empty) {
+          super.updateItem(item, empty);
+          if (item != null) {
+            setText(item.getName());
+            setFont(Font.font(16));
+          }
+        }
+      };
+    });
+    
+    // TODO configuration file with list of vaults
+
+    VBox leftPanel = new VBox(listVaultView);
+    leftPanel.setBorder(BORDER);
+
+    return leftPanel;
+  }
+
+  /**
+   * Create and set the new vault button
+   */
+  public Button newVaultBtn() {
+    Button newBtn = new Button("New Vault");
+    newBtn.setOnAction(event -> {
+      NewVaultPopup.addNewPage();
+    });
+
+    return newBtn;
+  }
+  
+  /**
+   * Create and set the import vault button
+   */
+  public Button importVaultBtn(Stage stage) {
+    DirectoryChooser directoryChooser = new DirectoryChooser();
+    directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+    
+    // Create button and set handler
+    Button importBtn = new Button("Import Vault"); 
+    importBtn.setOnAction(event -> {
+      // Get selected directory
+      File dir = directoryChooser.showDialog(stage);
+      
+      try {
+        // Check if a vault configuration file is present
+        List<Path> path = Files.find(Paths.get(dir.getAbsolutePath()), 1, (p, attr) -> p.getFileName().toString().endsWith(CONF_FILE_EXT)).toList();
+        
+        // If absent or multiple files throw error
+        if (path.size() != 1) {
+          throw new InvalidConfigurationException();
+        }   
+        
+        // Get UUID from vault
+        String vaultFilename = path.get(0).getFileName().toString();
+        vaultFilename = vaultFilename.substring(0, vaultFilename.length() - CONF_FILE_EXT.length());
+
+        // Create vault with obtained parameters and add to the list view
+        Vault v = new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
+        listVaultView.getItems().add(v);
+      } catch (IOException e) {
+        new Alert(AlertType.ERROR, "Cannot import " + dir + ": error while reading configuration file", ButtonType.OK).show();
+      } catch (InvalidConfigurationException e) {
+        new Alert(AlertType.ERROR, "Cannot import " + dir + ": configuration file invalid or absent",   ButtonType.OK).show();
       }
     });
 
-    primaryStage.show();
-
-    Rectangle2D primScreenBounds = Screen.getPrimary().getVisualBounds();
-    primaryStage.setX((primScreenBounds.getWidth() - primaryStage.getWidth()) / 2);
-    primaryStage.setY((primScreenBounds.getHeight() - primaryStage.getHeight()) / 2);
-  }
+    return importBtn;
+  } 
 
   public static void addNewVault(final Vault newVault){
 
     Button vault = new Button(newVault.getName() + "\n" + newVault.getStoragePath());
     vault.setWrapText(true);
-    vault.setMaxWidth(SCENE_WIDTH * 0.4);
+    vault.setMaxWidth(WIDTH * 0.4);
     
     newVaults.put(newVault, vault);
 
@@ -368,7 +437,7 @@ public class FirstPage extends Application {
     lockButton.setOnAction(new EventHandler<ActionEvent>() {
       @Override
       public void handle(ActionEvent event) {
-        v.lock();
+        //v.lock();
         rightPart = new VBox();
         borderPane.setRight(rightPart);
       }

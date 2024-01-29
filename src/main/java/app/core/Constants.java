@@ -15,7 +15,7 @@ public final class Constants {
   public static final String PROV_WRAP_KEYS = "SunJCE";
 
   public static final int    MAX_TOKEN_SIZE = 500;
-  public static final String ALG_HMAC_TOK= "HmacSHA512";
+  public static final String ALG_HMAC_TOK = "HmacSHA512";
   public static final char   PERIOD = '.';
 
   // File
@@ -28,4 +28,5 @@ public final class Constants {
   public static final int TAG_LEN_BITS = 128; // bits
   public static final int TAG_LEN = TAG_LEN_BITS / 8; // bytes
 
+  public static final String CONF_FILE_EXT  = ".vault";
 }
