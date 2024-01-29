@@ -31,8 +31,6 @@ public class Vault {
   private KeyManager km;
   private VaultConfiguration conf;
   
-  private String name;
-  
   /**
    * Create a new vault in "path" using "password" for keys derivation
    * @param name         The name of the vault (can be null); if null name = vid
@@ -422,16 +420,12 @@ public class Vault {
     return this.name;
   }
 
-  public String getStoragePath() {
-    return this.storagePath.toString();
-  }
-
   public void setName(String name){
     this.name = name;
   }
 
-  public String getName(){
-    return this.name;
+  public String getStoragePath() {
+    return this.storagePath.toString();
   }
 
   public VaultConfiguration getVaultConfiguration() {

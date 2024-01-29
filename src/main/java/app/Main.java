@@ -6,6 +6,6 @@ import javafx.application.Application;
 public class Main {
 
     public static void main(String[] args) {
-      Application.launch(FirstPage.class, args);
+      Application.launch(PersonalVault.class, args);
     }
 }

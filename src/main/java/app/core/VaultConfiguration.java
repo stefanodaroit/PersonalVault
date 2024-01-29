@@ -1,5 +1,7 @@
 package app.core;
 
+import static app.core.Constants.CONF_FILE_EXT;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -109,10 +111,10 @@ public class VaultConfiguration implements Serializable {
    * @return Path obj
    */
   public static Path getPath(Path path, UUID vid) {
-    return path.resolve(vid.toString() + ".vault");
+    return path.resolve(vid.toString() + CONF_FILE_EXT);
   }
   public static Path getPath(String path, UUID vid) {
-    return Paths.get(path, vid.toString() + ".vault");
+    return Paths.get(path, vid.toString() + CONF_FILE_EXT);
   }
 
   /**
