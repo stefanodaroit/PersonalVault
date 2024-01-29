@@ -3,6 +3,7 @@ package app.core;
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,7 +45,9 @@ public class File {
             // Get the raw key bytes
             byte[] keyBytes = secretKey.getEncoded();
             System.out.println(keyBytes);
-            headerIV = new byte[]{1, 2, 3, 4, 5};
+
+            this.headerIV = new byte[IVLEN];
+            this.gen.nextBytes(this.headerIV);
         } catch (NoSuchAlgorithmException e) {
             System.out.println(e);
         }
@@ -105,19 +108,26 @@ public class File {
     /**
      * function to encrypt the header (called in encrypt())
      */
-    public byte[] encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    public byte[] encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         KeyGenerator keygen = KeyGenerator.getInstance("AES");
-        keygen.init(Constants.SALT_LENGTH, this.gen);
+        keygen.init(128, this.gen);
         this.fileKey = keygen.generateKey();
 
         Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-        c.init(Cipher.ENCRYPT_MODE, this.fileKey);
+        this.gen.nextBytes(this.headerIV);
+        GCMParameterSpec spec = new GCMParameterSpec(128, headerIV);
+        c.init(Cipher.ENCRYPT_MODE, encKey, spec, this.gen);
 
-        this.headerIV = c.getIV();
+        byte[] encFilename = c.doFinal(this.filename.getBytes());
 
-        c.update(this.filename.getBytes());
+        byte[] output = new byte[IVLEN + encFilename.length];
+        System.arraycopy(headerIV, 0, output, 0, IVLEN);
+        // Copy encryptedBytes into the new array
+        System.arraycopy(encFilename, 0, output, IVLEN, encFilename.length);
+
 //        c.update(this.fileKey.getEncoded());
-        return c.doFinal();
+//        return c.doFinal();
+        return output;
     }
 
 
@@ -179,8 +189,24 @@ public class File {
         /**
      * function to decrypt the header (called in decrypt())
      */
-    public void decryptHeader(SecretKey encKey) {
+    public String decryptHeader(SecretKey encKey, byte[] encrypted) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
 
+        byte[] iv = new byte[IVLEN];
+        byte[] ciphertext = new byte[encrypted.length - IVLEN];
+        // first part is the IV
+        System.arraycopy(encrypted, 0, iv, 0, IVLEN);
+        GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+        c.init(Cipher.DECRYPT_MODE, encKey, spec, this.gen);
+
+        // second part is the ciphertext
+        System.arraycopy(encrypted, IVLEN, ciphertext, 0, ciphertext.length);
+
+        byte[] filenameBytes = c.doFinal(ciphertext);
+        String filenameStr = new String(filenameBytes, StandardCharsets.UTF_8);
+
+        System.out.println(filenameStr);
+        return filenameStr;
     }
 
 
