@@ -30,14 +30,11 @@ public class TestMain {
       SecretKey encKey = keygen.generateKey();
 
       File fe = new File("./", "README.md");
-      byte[] encOutput = fe.encryptHeader(encKey);
-      String filename = new String(encOutput, StandardCharsets.UTF_8);
-      System.out.println(filename);
-      fe.encrypt();
+      byte[] encHeaderOutput = fe.encrypt(encKey);
 
       File fd = new File("./", "README.md.enc");
-      fd.decryptHeader(encKey, encOutput);
-      fd.decrypt();
+      fd.decrypt(encKey, encHeaderOutput);
+
     } catch (Exception e) {
       e.printStackTrace();
     }
