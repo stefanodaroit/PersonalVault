@@ -6,10 +6,13 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
 
 public class VaultConfiguration implements Serializable {
   
-  private final int vid;    // Vault ID
+  private final String vid;    // Vault ID
   
   private byte[] salt;      // Salt used for key derivation
   private byte[] encKey;    // Encrypted symmetric key for files' header
@@ -19,13 +22,13 @@ public class VaultConfiguration implements Serializable {
    * Constructor used to initialize the vault configuration with the provided 
    * vault ID, salt, encrypted file header key, and encrypted HMAC key
    * 
-   * @param vid int  vault ID
+   * @param vid UUID  vault ID
    * @param salt byte[]  salt used for key derivation
    * @param encKey byte[]  encrypted symmetric key for files' header
    * @param authKey byte[]  encrypted symmetric key for HMAC
    */
-  public VaultConfiguration(int vid, byte[] salt, byte[] encKey, byte[] authKey) {
-    this.vid = vid;
+  public VaultConfiguration(UUID vid, byte[] salt, byte[] encKey, byte[] authKey) {
+    this.vid = vid.toString();
     this.salt = salt;
     this.encKey = encKey;
     this.authKey = authKey;
@@ -100,12 +103,16 @@ public class VaultConfiguration implements Serializable {
    * Method used to generate a path for storing the serialized configuration file 
    * based on a given directory path and vault ID.
    * 
-   * @param path String  Directory path
-   * @param vid int  Vault ID
-   * @return
+   * @param path Directory path
+   * @param vid  Vault ID
+   * 
+   * @return Path obj
    */
-  public static String getPath(String path, int vid) {
-    return path + "/" + vid + "-config.vault";
+  public static Path getPath(Path path, UUID vid) {
+    return path.resolve(vid.toString() + ".vault");
+  }
+  public static Path getPath(String path, UUID vid) {
+    return Paths.get(path, vid.toString() + ".vault");
   }
 
   /**
