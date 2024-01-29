@@ -14,7 +14,7 @@ public final class Constants {
   public static final String ALG_WRAP_KEYS  = "AESWrap";
   public static final String PROV_WRAP_KEYS = "SunJCE";
 
+  public static final int    MAX_TOKEN_SIZE = 500;
   public static final String ALG_HMAC_TOK= "HmacSHA512";
   public static final char   PERIOD = '.';
-
 }

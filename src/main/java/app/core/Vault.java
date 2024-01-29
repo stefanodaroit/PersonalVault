@@ -1,6 +1,7 @@
 package app.core;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -116,15 +117,13 @@ public class Vault {
       throw new NullPointerException("Path cannot be null");
     }
 
-    // Loop over the directory content
-    Files.walk(Paths.get(path)).forEach(source -> {
-      try {
-        // Copy file considering the subdirectories
-        addFile(source, source.subpath(this.storagePath.getNameCount() - 1, source.getNameCount()));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    });
+    // Loop over the source directory content
+    Path srcDir = Paths.get(path);
+    for (Path file : Files.walk(srcDir).toList()) {
+      // Copy file considering the subdirectories
+      Path dest = file.subpath(srcDir.getNameCount() - 1, file.getNameCount());
+      addFile(file, dest);
+    }
   }
 
   /**
@@ -205,6 +204,7 @@ public class Vault {
     }
 
     this.locked = false;
+    // TODO add decryption part
   }
 
   /**
@@ -259,7 +259,16 @@ public class Vault {
     
     try {
       // Read and decode token from the vault root
-      byte[] token = Files.readAllBytes(VaultConfiguration.getPath(this.storagePath, this.vid));
+      Path confPath = VaultConfiguration.getPath(this.storagePath, this.vid);
+      FileChannel channel = FileChannel.open(confPath);
+
+      // Check if configuration file is too large
+      if (channel.size() > MAX_TOKEN_SIZE) {
+        System.out.println("Vault configuration file is too large");
+        throw new InvalidConfigurationException();
+      }
+      
+      byte[] token = Files.readAllBytes(confPath);
       byte[] serializedConf = decodeToken(token); 
       
       // Deserialize VaultConfiguration object
@@ -417,6 +426,10 @@ public class Vault {
 
   public VaultConfiguration getVaultConfiguration() {
     return this.conf;
+  }
+
+  public boolean isLocked() {
+    return this.locked;
   }
 
   public static class InvalidConfigurationException extends Exception { 

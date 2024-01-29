@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.UUID;
 
 import org.junit.Assert;
@@ -15,15 +16,19 @@ import app.core.Vault;
 import app.core.VaultConfiguration;
 import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.Vault.InvalidConfigurationException;
+import app.core.Vault.VaultLockedException;
 import app.core.Vault.WrongPasswordException;
 import junit.framework.TestCase;
 
 public class VaultTest extends TestCase{
   
   private Vault v;
-  private final String PSW = "SecretP@ssword1234";
-  private final String PATH = ".";
-  private final String NAME = "Vault";
+  private static final String PSW = "SecretP@ssword1234";
+  private static final String PATH = ".";
+  private static final String NAME = "Vault";
+  private static final String DIR = PATH + "/tmpDir", SUBDIR = "subDir";
+  private static final String FILE1 = "file1", FILE2 = "file2";
+  private static final String INVPATH = "/home/app/";
 
   public static void swap(byte[] array, int idx1, int idx2) {
     if (array[idx1] == array[idx2]) {
@@ -38,14 +43,25 @@ public class VaultTest extends TestCase{
     array[idx2] = tmp;
   }
 
+  public static void createTmpDir() throws IOException {
+    Files.createDirectories(Paths.get(DIR, SUBDIR));
+    Files.createFile(Paths.get(DIR, FILE1));
+    Files.createFile(Paths.get(DIR, SUBDIR, FILE2));
+  }
+
+  public static void deleteDirectory(String path) throws IOException {
+    Files.walk(Paths.get(path))
+      .sorted(Comparator.reverseOrder())
+      .map(Path::toFile)
+      .forEach(File::delete);
+  }
+
   public static void deleteConfig(Vault v) throws IOException {
     if (v == null) { return; }
     
     File vaultDir = new File(v.getStoragePath()); 
-    if (vaultDir != null) { 
-      Files.walk(Paths.get(v.getStoragePath()))
-      .map(Path::toFile)
-      .forEach(File::delete);
+    if (vaultDir != null) {
+      deleteDirectory(v.getStoragePath());
       vaultDir.delete(); 
     }
   }
@@ -165,16 +181,15 @@ public class VaultTest extends TestCase{
 
   @Test
   public void testInvalidPath() throws Exception {
-    final String invalidPath = "/home/app/";
     v = new Vault(NAME, PATH, PSW);
     
     try {
-      new Vault(NAME, invalidPath, PSW);
+      new Vault(NAME, INVPATH, PSW);
       Assert.fail("IOException not thrown");
     } catch (IOException e) {}
 
     try {
-      new Vault(v.getVid(), NAME, invalidPath);
+      new Vault(v.getVid(), NAME, INVPATH);
       Assert.fail("IOException not thrown");
     } catch (IOException e) {}
 
@@ -226,6 +241,60 @@ public class VaultTest extends TestCase{
     deleteConfig(v);
   }
 
- 
+  @Test
+  public void testFillVault() throws Exception {   
+    createTmpDir();
     
+    // New vault and add directory and file
+    v = new Vault(NAME, PATH, PSW);
+    v.addDirectory(DIR);
+    v.addFile(DIR + '/' + SUBDIR + '/' + FILE2);     
+
+    // Import vault and add subdirectory to vault root
+    v = new Vault(v.getVid(), NAME, PATH);
+    v.unlock(PSW);
+    v.addDirectory(DIR + '/' + SUBDIR);
+
+    try {
+      v.addDirectory(null); 
+      Assert.fail("NullPointerException not thrown");
+    } catch (NullPointerException e) {}
+
+    try {
+      v.addFile(null); 
+      Assert.fail("NullPointerException not thrown");
+    } catch (NullPointerException e) {}
+
+    deleteConfig(v);
+    
+    // Try to add non-existing directory
+    try {
+      v = new Vault(NAME, PATH, PSW);
+      v.addDirectory(INVPATH); 
+      Assert.fail("IOException not thrown");
+    } catch (IOException e) {
+      deleteConfig(v);
+    }
+
+    // Try to add already existing directory
+    try {
+      v = new Vault(NAME, PATH, PSW);
+      v.addDirectory(DIR); 
+      v.addDirectory(DIR); 
+      Assert.fail("IOException not thrown");
+    } catch (IOException e) {
+      deleteConfig(v);
+    }
+
+    // Try to edit a locked vault
+    try {
+      v = new Vault(new Vault(NAME, PATH, PSW).getVid(), NAME, PATH);
+      v.addDirectory(DIR); 
+      Assert.fail("VaultLockedException not thrown");
+    } catch (VaultLockedException e) {
+      deleteConfig(v);
+    }
+
+    deleteDirectory(DIR);
+  }  
 }
