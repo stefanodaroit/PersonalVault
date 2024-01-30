@@ -120,8 +120,8 @@ public class PersonalVault extends Application {
         protected void updateItem(Vault item, boolean empty) {
           super.updateItem(item, empty);
           if (item != null) {
-            setText(item.getName());
-            setFont(Font.font(16));
+            setText(item.toString());
+            setFont(Font.font(14));
           }
         }
       };
@@ -141,7 +141,7 @@ public class PersonalVault extends Application {
   public Button newVaultBtn() {
     Button newBtn = new Button("New Vault");
     newBtn.setOnAction(event -> {
-      NewVaultPopup.addNewPage();
+      new NewVaultStage(listVaultView);
     });
 
     return newBtn;
@@ -159,6 +159,10 @@ public class PersonalVault extends Application {
     importBtn.setOnAction(event -> {
       // Get selected directory
       File dir = directoryChooser.showDialog(stage);
+      if (dir == null) { 
+        System.out.println("No location selected.");
+        return; 
+      }
       
       try {
         // Check if a vault configuration file is present
@@ -175,6 +179,8 @@ public class PersonalVault extends Application {
 
         // Create vault with obtained parameters and add to the list view
         Vault v = new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
+        
+        // TODO avoid double import
         listVaultView.getItems().add(v);
       } catch (IOException e) {
         new Alert(AlertType.ERROR, "Cannot import " + dir + ": error while reading configuration file", ButtonType.OK).show();
@@ -269,10 +275,9 @@ public class PersonalVault extends Application {
     newPasswordField.textProperty().addListener(new ChangeListener<String>() {
       @Override
       public void changed(ObservableValue<? extends String> observable, String oldValue, String newValue) {
-          KeyDerivator kd = new KeyDerivator();
           String message = "";
           try {
-              kd.validatePassword(newValue);
+              KeyDerivator.validatePassword(newValue);
           } catch (InvalidPasswordException e) {
               message = e.getMessage();
           }
