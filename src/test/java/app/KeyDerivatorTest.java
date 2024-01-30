@@ -41,7 +41,7 @@ public class KeyDerivatorTest{
   @Test
   public void testNullPswValidate() throws Exception {   
     try {
-      kd.validatePassword(null);
+      KeyDerivator.validatePassword(null);
       Assert.fail("NullPointerException not thrown");
     } catch(NullPointerException e) {}
   }
@@ -50,7 +50,7 @@ public class KeyDerivatorTest{
   public void testShortPsw() {     
     try {
       String password = "P@ssword123"; 
-      kd.validatePassword(password);
+      KeyDerivator.validatePassword(password);
       Assert.fail("InvalidPasswordException not thrown");
     } catch(InvalidPasswordException e) {}
   }
@@ -59,7 +59,7 @@ public class KeyDerivatorTest{
   public void testLongPsw() {     
     try {
       String password = "SecretP@ssword1234fffffffffffffffffffffffffffffffffffffffffffffff";
-      kd.validatePassword(password);
+      KeyDerivator.validatePassword(password);
       Assert.fail("InvalidPasswordException not thrown");
     } catch(InvalidPasswordException e) {}
   }
@@ -68,7 +68,7 @@ public class KeyDerivatorTest{
   public void testNoSpecialPsw() {
     try {
       String password = "SecretPassword1234";
-      kd.validatePassword(password);
+      KeyDerivator.validatePassword(password);
       Assert.fail("InvalidPasswordException not thrown");
     } catch(InvalidPasswordException e) {}
   }
@@ -77,7 +77,7 @@ public class KeyDerivatorTest{
   public void testNoUpperCasePsw() {     
     try {
       String password = "secretp@ssword1234";
-      kd.validatePassword(password);
+      KeyDerivator.validatePassword(password);
       Assert.fail("InvalidPasswordException not thrown");
     } catch(InvalidPasswordException e) {}
   }
@@ -86,7 +86,7 @@ public class KeyDerivatorTest{
   public void testNoDigitPsw() {     
     try {
       String password = "SecretP@ssword";
-      kd.validatePassword(password);
+      KeyDerivator.validatePassword(password);
       Assert.fail("InvalidPasswordException not thrown");
     } catch(InvalidPasswordException e) {}
   }
@@ -95,7 +95,7 @@ public class KeyDerivatorTest{
   public void testNoLowerCasePsw() {     
     try {
       String password = "SECRETP@SSWORD1234";
-      kd.validatePassword(password);
+      KeyDerivator.validatePassword(password);
       Assert.fail("InvalidPasswordException not thrown");
     } catch(InvalidPasswordException e) {}
   }

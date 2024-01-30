@@ -29,4 +29,7 @@ public final class Constants {
   public static final int TAG_LEN = TAG_LEN_BITS / 8; // bytes
 
   public static final String CONF_FILE_EXT  = ".vault";
+  public static final String VAULT_NAME_RGX = "^[a-zA-Z0-9_ ]+$";
+
+  public static final String[] PSW_EXCEPTION = { "(Short)", "(Long)", "(Special)", "(Upper)", "(Lower)", "(Digit)" };
 }

@@ -46,12 +46,12 @@ public class Vault {
       throw new NullPointerException("Null vault parameter");
     }
 
-    if (!name.matches("^[a-zA-Z0-9_ ]+$")) {
+    if (!(name == null || name.length() == 0 || name.matches(VAULT_NAME_RGX))) {
       throw new IllegalArgumentException("Invalid vault name");
     }
     
     this.vid = UUID.randomUUID();
-    this.name = name != null ? name : this.vid.toString();
+    this.name = (name != null && name.length() != 0) ? name : this.vid.toString();
     this.locked = false;
     
     try {
@@ -64,7 +64,7 @@ public class Vault {
       throw new InternalException();
     }
 
-    this.storagePath = Paths.get(storagePath, name);
+    this.storagePath = Paths.get(storagePath, this.name);
     Files.createDirectory(this.storagePath);
     
     // Create and save vault configuration
@@ -87,13 +87,13 @@ public class Vault {
       throw new NullPointerException("Invalid vault parameters");
     }
 
-    if (!name.matches("^[a-zA-Z0-9_]+$")) {
+    if (!(name == null || name.length() == 0 || name.matches(VAULT_NAME_RGX))) {
       throw new IllegalArgumentException("Invalid vault name");
     }
     
     this.vid = vid;
-    this.name = name != null ? name : this.vid.toString();
-    this.storagePath = Paths.get(storagePath, name);
+    this.name = (name != null && name.length() != 0) ? name : this.vid.toString();
+    this.storagePath = Paths.get(storagePath, this.name);
     
     try {
       // Read vault configuration and init key manager
@@ -434,6 +434,11 @@ public class Vault {
 
   public boolean isLocked() {
     return this.locked;
+  }
+
+  @Override
+  public String toString() {
+    return this.name + '\n' + this.storagePath.toString();
   }
 
   public static class InvalidConfigurationException extends Exception { 
