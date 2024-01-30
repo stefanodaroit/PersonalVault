@@ -14,6 +14,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Base64;
 
 public class File {
 
@@ -42,19 +43,18 @@ public class File {
     /**
      * public method to encrypt the file
      */
-    public byte[] encrypt(SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
-        byte[] encHeaderOutput = this.encryptHeader(encKey);
-        this.encryptContent();
+    public String encrypt(SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+        String encHeaderOutput = this.encryptHeader(encKey);
+        this.encryptContent(encHeaderOutput);
         this.encrypted = true;
 
         return encHeaderOutput;
     }
 
-
     /**
      * function to encrypt the header (called in encrypt())
      */
-    private byte[] encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+    private String encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         KeyGenerator keygen = KeyGenerator.getInstance("AES");
         keygen.init(128, this.gen);
         this.fileKey = keygen.generateKey();
@@ -81,14 +81,14 @@ public class File {
         System.arraycopy(headerIV, 0, output, 0, IVLEN);
         System.arraycopy(encHeader, 0, output, IVLEN, encHeader.length);
 
-        return output;
+        String outputBase = Base64.getUrlEncoder().encodeToString(output);
+        return outputBase;
     }
-
 
     /**
      * function to encrypt the content (called in encrypt())
      */
-    private void encryptContent() {
+    private void encryptContent(String encryptedFilename) {
         try {
             byte[] iv = new byte[IVLEN];
             this.gen.nextBytes(iv);
@@ -98,7 +98,7 @@ public class File {
             InputStream is = Files.newInputStream(Paths.get(this.path, this.filename)); // input file stream
 
             ByteArrayOutputStream temp = new ByteArrayOutputStream(); // temporary output
-            OutputStream encryptedOutput = Files.newOutputStream(Paths.get(this.filename + ".enc")); // encrypted file output
+            OutputStream encryptedOutput = Files.newOutputStream(Paths.get(encryptedFilename)); // encrypted file output
 
             byte[] buffer = new byte[CHUNK_SIZE];
             int bytesRead;
@@ -136,23 +136,26 @@ public class File {
     }
 
 
+
+
     /**
      * public method to decrypt the file
      */
-    public void decrypt(SecretKey encKey, byte[] encrypted) throws InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
-        String originalFilename = this.decryptHeader(encKey, encrypted);
+    public String decrypt(SecretKey encKey) throws InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        String originalFilename = this.decryptHeader(encKey);
         this.decryptContent("decrypted_" + originalFilename);
 
         this.encrypted = false;
+        return originalFilename;
     }
-
 
     /**
      * function to decrypt the header (called in decrypt())
      */
-    private String decryptHeader(SecretKey encKey, byte[] encrypted) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    private String decryptHeader(SecretKey encKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
 
+        byte[] encrypted = Base64.getUrlDecoder().decode(this.filename);
         byte[] ciphertext = new byte[encrypted.length - IVLEN];
 
         // first part is the IV
@@ -173,10 +176,9 @@ public class File {
         System.arraycopy(headerBytes, ENCODED_KEY_LENGTH, filename, 0, headerBytes.length - ENCODED_KEY_LENGTH);
 
         String filenameStr = new String(filename, StandardCharsets.UTF_8);
-        System.out.println(filenameStr);
+//        System.out.println(filenameStr);
         return filenameStr;
     }
-
 
     /**
      * function to decrypt the content (called in decrypt())
@@ -186,6 +188,7 @@ public class File {
             // Initialize the cipher for content decryption
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
 
+            // TODO: Large file (>512MB?) overflows heap space... use a stream and get file size with   long size = Files.size(path);
             byte[] inputData = Files.readAllBytes(Paths.get(this.path, this.filename)); // read encrypted file
 
             byte[] iv = new byte[IVLEN];
