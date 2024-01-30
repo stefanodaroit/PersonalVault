@@ -156,14 +156,14 @@ public class File {
     /**
      * public method to decrypt the file
      */
-    public String decrypt(SecretKey encKey) throws InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IOException {
+    public String decrypt(SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
+        Path dstFilePath = Paths.get(this.path, this.filename);
+        int dstFileSize = (int)Files.size(dstFilePath); // MAX 2.14 GB !!!
+        InputStream inputData = Files.newInputStream(dstFilePath); // input file stream
 
-        // TODO: Large file (>512MB?) overflows heap space... use a stream and get file size with   long size = Files.size(path);
-        byte[] inputData = Files.readAllBytes(Paths.get(this.path, this.filename)); // read encrypted file
-
-        String originalFilename = this.decryptHeader(encKey, inputData);
+        String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
         // TODO: filename should be only the originalFilename
-        this.decryptContent("decrypted_" + originalFilename, inputData);
+        this.decryptContent("decrypted_" + originalFilename, inputData, dstFileSize);
 
         this.encrypted = false;
 
@@ -173,10 +173,11 @@ public class File {
     /**
      * function to decrypt the header (called in decrypt())
      */
-    private String decryptHeader(SecretKey encKey, byte[] inputData) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+    private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         int headerFullSize = IVLEN + KEY_SIZE_ENCODED + 1 + FILENAME_MAX_SIZE + 16; // last 16 bytes are GCM authentication tag
         byte[] encrypted = new byte[headerFullSize];
-        System.arraycopy(inputData, 0, encrypted, 0, headerFullSize);
+//        System.arraycopy(inputData, 0, encrypted, 0, headerFullSize);
+        int _inputBytesRead = inputData.read(encrypted);
 
         // first part of the full header data is the IV
         System.arraycopy(encrypted, 0, this.headerIV, 0, IVLEN);
@@ -208,16 +209,17 @@ public class File {
     /**
      * function to decrypt the content (called in decrypt())
      */
-    private void decryptContent(String outputFilename, byte[] fileData) {
+    private void decryptContent(String outputFilename, InputStream fileData, int inputSize) {
         try {
             final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE_ENCODED + 1 + FILENAME_MAX_SIZE + 16;
 
-            byte[] contentData = new byte[fileData.length - HEADER_FULL_SIZE];
-            System.arraycopy(fileData, HEADER_FULL_SIZE, contentData, 0, fileData.length - HEADER_FULL_SIZE);
+            byte[] contentData = new byte[inputSize - HEADER_FULL_SIZE];
+//            System.arraycopy(fileData, HEADER_FULL_SIZE, contentData, 0, inputSize - HEADER_FULL_SIZE);
+            int _fileBytesRead = fileData.read(contentData);
 
             byte[] iv = new byte[IVLEN];
             ByteArrayInputStream is = new ByteArrayInputStream(contentData); // input file stream to read chunks
-            ByteArrayOutputStream temp = new ByteArrayOutputStream(); // temporary output
+            OutputStream outputFile = Files.newOutputStream(Paths.get(this.path, outputFilename));
 
             // chunk: first part is IV, then the actual content plus the 16 bytes GCM authentication tag
             byte[] buffer = new byte[IVLEN + CHUNK_SIZE + 16];
@@ -236,16 +238,13 @@ public class File {
                 // second part is the ciphertext
                 byte[] decryptedChunk = this.c.doFinal(buffer, IVLEN, bytesRead - IVLEN); // Decrypt the chunk
 
-                temp.write(decryptedChunk);
+                outputFile.write(decryptedChunk);
 
                 chunkIndex++;
             }
 
-            Path decryptedFilePath = Paths.get(this.path, outputFilename); // output file
-            Files.write(decryptedFilePath, temp.toByteArray(), StandardOpenOption.CREATE);
-
             is.close();
-            temp.close();
+            outputFile.close();
 
         } catch (Exception e) {
             e.printStackTrace();
