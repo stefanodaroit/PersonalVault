@@ -26,14 +26,14 @@ public class TestMain {
 
 
       KeyGenerator keygen = KeyGenerator.getInstance("AES");
-      keygen.init(128);
+      keygen.init(256); // bits
       SecretKey encKey = keygen.generateKey();
 
       File fe = new File("./", "README.md");
-      String encHeaderOutput = fe.encrypt(encKey);
-      System.out.println(encHeaderOutput);
+      String encFilename = fe.encrypt(encKey);
+      System.out.println(encFilename);
 
-      File fd = new File("./", encHeaderOutput);
+      File fd = new File("./", encFilename);
       String originalFilename = fd.decrypt(encKey);
       System.out.println(originalFilename);
 
