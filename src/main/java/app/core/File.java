@@ -203,17 +203,19 @@ public class File {
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
         String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
+
+        // TODO: filename should be only the originalFilename
+        Path dstFilePath = Path.of(this.path.toString(), "decrypted_" + originalFilename).normalize();
         try {
-            // TODO: filename should be only the originalFilename
-            this.decryptContent("decrypted_" + originalFilename, inputData, dstFileSize);
+            this.decryptContent(dstFilePath, inputData, dstFileSize);
         } catch (Exception e) {
-            Files.deleteIfExists(Path.of(this.path.toString(), "decrypted_" + originalFilename));
+            Files.deleteIfExists(dstFilePath);
             throw e;
         }
 
         this.encrypted = false;
 
-        return "decrypted_" + originalFilename;
+        return dstFilePath.getFileName().toString();
     }
 
     /**
@@ -262,7 +264,7 @@ public class File {
 
     /**
      * function to decrypt the content (called in decrypt())
-     * @param outputFilename filename of the plaintext file to be written
+     * @param outputFilePath path of the plaintext file to be written
      * @param fileData stream of the encrypted file
      * @param inputSize size of the encrypted file
      * @throws IOException
@@ -271,8 +273,7 @@ public class File {
      * @throws IllegalBlockSizeException
      * @throws BadPaddingException
      */
-    private void decryptContent(String outputFilename, InputStream fileData, int inputSize) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-        outputFilename = Path.of(outputFilename).normalize().getFileName().toString();
+    private void decryptContent(Path outputFilePath, InputStream fileData, int inputSize) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + 16;
 
         byte[] contentData = new byte[inputSize - HEADER_FULL_SIZE];
@@ -280,7 +281,7 @@ public class File {
 
         byte[] iv = new byte[IVLEN];
         ByteArrayInputStream is = new ByteArrayInputStream(contentData); // input file stream to read chunks
-        OutputStream outputFile = Files.newOutputStream(Path.of(this.path.toString(), outputFilename));
+        OutputStream outputFile = Files.newOutputStream(outputFilePath);
 
         // chunk: first part is IV, then the actual content plus the 16 bytes GCM authentication tag
         byte[] buffer = new byte[IVLEN + CHUNK_SIZE + 16];
