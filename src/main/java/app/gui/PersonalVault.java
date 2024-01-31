@@ -31,39 +31,27 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.security.InvalidKeyException;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.Scanner;
-import java.util.UUID;
+import java.util.StringJoiner;
 
 
 public class PersonalVault extends Application {
 
   private final static double WIDTH = 1000, HEIGHT = 700, SPACING = 10;
   private final static String SRC = System.getProperty("user.home");
+  private final static Path CONF = Paths.get(System.getProperty("user.home"), "personal-vault.conf");
   private final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
+  public  final static Background BACKGROUND = new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY));
   
-  private static ListView<Vault> listVaultView = new ListView<Vault>();
+  private ListView<Vault> listVaultView = new ListView<Vault>();
   private BorderPane borderPane = new BorderPane();
-  static HashMap<Vault, Button> newVaults = new HashMap<Vault, Button>();
-  static VBox rightPart = new VBox();  
 
   @Override
   public void start(Stage primaryStage){
@@ -80,6 +68,7 @@ public class PersonalVault extends Application {
     VBox rightPanel = new VBox();
     rightPanel.setPrefSize(WIDTH * 0.6, HEIGHT);
     rightPanel.setBorder(BORDER);
+    rightPanel.setBackground(BACKGROUND);
 
     // Bottom panel
     HBox bottomPanel = new HBox();
@@ -87,6 +76,7 @@ public class PersonalVault extends Application {
     bottomPanel.setSpacing(SPACING);
     bottomPanel.setPrefSize(WIDTH, HEIGHT * 0.05);
     bottomPanel.getChildren().addAll(newVaultBtn(), importVaultBtn(primaryStage));
+    bottomPanel.setBackground(BACKGROUND);
 
     // Push the different panels in the main layout
     borderPane.setTop(topPanel);
@@ -136,7 +126,7 @@ public class PersonalVault extends Application {
     
 
     // Add all vaults
-    List<String> paths = readPaths();
+    List<String> paths = getStoredVaults();
     for(String path: paths){
       File f = new File(path);
       try {
@@ -191,9 +181,8 @@ public class PersonalVault extends Application {
           new Alert(AlertType.ERROR, "Cannot import " + dir + ": the folder has already been imported", ButtonType.OK).show();
         } else {
           listVaultView.getItems().add(v);
-          savePaths();
+          saveStoredVaults(listVaultView.getItems());
         }
-        
       } catch (IOException e) {
         new Alert(AlertType.ERROR, "Cannot import " + dir + ": error while reading configuration file", ButtonType.OK).show();
       } catch (InvalidConfigurationException e) {
@@ -205,40 +194,35 @@ public class PersonalVault extends Application {
   } 
 
   /**
-   * Save all the vault paths into a file
-   * @throws IOException
+   * Save vault paths into configuration file
    */
-  public static void savePaths() throws IOException{
-    String pathsToSave = "";
-    for(Vault v: listVaultView.getItems()){
-      pathsToSave = pathsToSave + (v.getStoragePath()+"\n");
+  public static void saveStoredVaults(List<Vault> vaultList) {
+    StringJoiner paths = new StringJoiner("\n");
+    for(Vault v : vaultList) {
+      paths.add(v.getStoragePath());
     }
-
     try {
-      FileWriter myWriter = new FileWriter(SRC + "/paths.txt");
-      myWriter.write(pathsToSave);
-      myWriter.close();
+      Files.write(CONF, paths.toString().getBytes());
     } catch (IOException e) {
-      System.out.println(e.getMessage());
+      System.err.println("Cannot write configuration file");
     }
-    
   }
 
   /**
-   * Read the path of the file
-   * @return
+   * Read vault paths from configuration file
    */
-  private List<String> readPaths() {
+  private static List<String> getStoredVaults() {
     List<String> paths = new ArrayList<>();
+
     try {
-      File myObj = new File(SRC + "/paths.txt");
-      Scanner myReader = new Scanner(myObj);
-      while (myReader.hasNextLine()) {
-        paths.add(myReader.nextLine());
+      Scanner scan = new Scanner(CONF.toFile());
+      while (scan.hasNextLine()) {
+        paths.add(scan.nextLine());
       }
-      myReader.close();
+      scan.close();
     } catch (FileNotFoundException e) {
-      System.out.println(e.getMessage());
+      System.out.println("Configuration file absent");
+      return paths;
     }
 
     return paths;
@@ -354,103 +338,4 @@ public class PersonalVault extends Application {
   //   // Show the new stage
   //   primaryStage.show();
   // }
-
-  // private static void unlockVault(final Vault v){
-  //   final Stage primaryStage = new Stage();
-  //   primaryStage.setTitle("Unlock Vault");
-
-  //   Label password = new Label("Enter password for " + v.getName());
-  //   final PasswordField passwordField = new PasswordField();
-
-  //   // Create a button for cancel input page
-  //   Button cancelPageButton = new Button("Cancel");
-  //   cancelPageButton.setOnAction(new EventHandler<ActionEvent>() {
-  //       @Override
-  //       public void handle(ActionEvent event) {
-  //           primaryStage.close();
-  //       }
-  //   });
-
-  //   // Create a button for cancel input page
-  //   Button unlockPageButton = new Button("Unlock");
-  //   unlockPageButton.setOnAction(new EventHandler<ActionEvent>() {
-  //       @Override
-  //       public void handle(ActionEvent event) {
-  //         try {
-  //           v.unlock(passwordField.getText());
-  //           Alert alert = new Alert(AlertType.CONFIRMATION, "Unlocked successfully!", ButtonType.OK);
-  //           alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-  //           alert.show();
-  //           primaryStage.close();
-  //           revealDrive(v);
-  //         } catch (InvalidConfigurationException e) {
-  //           e.getMessage();
-  //         } catch (WrongPasswordException e) {
-  //           Alert alert = new Alert(AlertType.WARNING, e.getMessage(), ButtonType.OK);
-  //           alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-  //           alert.show();
-  //         } catch (InternalException e) {
-  //           e.getMessage();
-  //         }
-  //       }
-  //   });
-
-  //   // Create a layout 
-  //   VBox layout = new VBox(SPACING);
-  //   layout.getChildren().addAll(password, passwordField);
-  //   layout.setAlignment(Pos.CENTER);
-
-  //   // Create a layout 
-  //   HBox buttons = new HBox(SPACING);
-  //   buttons.getChildren().addAll(cancelPageButton, unlockPageButton);
-  //   buttons.setAlignment(Pos.CENTER);
-
-
-  //   // Create the main layout
-  //   BorderPane borderPaneNew = new BorderPane();
-  //   borderPaneNew.setTop(layout);
-  //   borderPaneNew.setBottom(buttons);
-
-  //   // Set the new scene for the new stage
-  //   Scene newPageScene = new Scene(borderPaneNew, 500, 400);
-  //   primaryStage.setScene(newPageScene);
-
-  //   // Show the new stage
-  //   primaryStage.show();
-  // }
-
-  // private static void revealDrive(final Vault v){
-  //   Label label = new Label(v.getName() + "\n" + v.getStoragePath());
-  //   Label revealLabel = new Label("Your vault's contants are accessible here:");
-  //   Button revealButton = new Button("Reveal Vault");
-  //   Button lockButton = new Button("Lock");
-
-  //   revealButton.setOnAction(new EventHandler<ActionEvent>() {
-  //     @Override
-  //     public void handle(ActionEvent event) {
-  //       //TODO
-  
-  //     }
-  //   });
-
-  //   lockButton.setOnAction(new EventHandler<ActionEvent>() {
-  //     @Override
-  //     public void handle(ActionEvent event) {
-  //       //v.lock();
-  //       rightPart = new VBox();
-  //       borderPane.setRight(rightPart);
-  //     }
-  //   });
-
-  //   rightPart = new VBox();
-  //   rightPart.getChildren().addAll(label, revealLabel, revealButton, lockButton);
-  //   rightPart.setAlignment(Pos.TOP_LEFT);
-    
-
-  //   borderPane.setRight(rightPart);
-    
-
-  // }
-
-
 }

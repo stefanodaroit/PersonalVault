@@ -5,6 +5,7 @@ import static app.core.Constants.VAULT_NAME_RGX;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import app.core.KeyDerivator;
 import app.core.Vault;
@@ -37,7 +38,7 @@ public class NewVaultStage extends Stage {
   private String vaultPath;
   private String vaultPsw;
 
-  private ListView<Vault> listVaultView;
+  private List<Vault> listVault;
 
   public NewVaultStage(ListView<Vault> listVaultView) {
     super();
@@ -45,7 +46,7 @@ public class NewVaultStage extends Stage {
     this.vaultName = "";
     this.vaultPath = "";
     this.vaultPsw  = "";
-    this.listVaultView = listVaultView;
+    this.listVault = listVaultView.getItems();
     
     this.setScene(setNameScene());
     this.setTitle("Add New Vault");
@@ -222,12 +223,14 @@ public class NewVaultStage extends Stage {
       // Create vault and add to the listview
       try {
         Vault v = new Vault(this.vaultName, this.vaultPath, this.vaultPsw);
-        this.listVaultView.getItems().add(v);
-        PersonalVault.savePaths();
+        this.listVault.add(v);
+        PersonalVault.saveStoredVaults(this.listVault);
         this.close();
       } catch (InvalidPasswordException e) {
         new Alert(AlertType.ERROR, "Invalid Password", ButtonType.OK).show();
-      } catch (IOException | InternalException e) {
+      } catch (IOException e) {
+        new Alert(AlertType.ERROR, "Cannot create vault: a vault with same name already exists", ButtonType.OK).show();
+      } catch (InternalException e) {
         new Alert(AlertType.ERROR, "Cannot create vault: internal error", ButtonType.OK).show();
       }
     });
