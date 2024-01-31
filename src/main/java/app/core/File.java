@@ -42,6 +42,9 @@ public class File {
      * @throws NoSuchAlgorithmException
      */
     public File(String path, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+        if (path == null || filename == null) {
+            throw new IOException("path and filename cannot be null");
+        }
         this.path = Path.of(path).normalize();
         this.filename = Path.of(filename).normalize().getFileName().toString();
 
@@ -67,15 +70,18 @@ public class File {
      * @throws IOException
      */
     public String encrypt(SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+        if (encKey == null) {
+            throw new InvalidKeyException("encryption key cannot be null");
+        }
         StringBuilder encFilename = new StringBuilder();
 
         byte[] encHeader = this.encryptHeader(encKey, encFilename);
+        byte[] encContent = this.encryptContent();
 
         String encFilenameStr = Path.of(encFilename.toString()).normalize().getFileName().toString();
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(this.path.toString(), encFilenameStr)); // encrypted file output
-        encryptedOutput.write(encHeader);
 
-        byte[] encContent = this.encryptContent();
+        encryptedOutput.write(encHeader);
         encryptedOutput.write(encContent);
 
         encryptedOutput.close();
@@ -189,13 +195,21 @@ public class File {
      * @throws IOException
      */
     public String decrypt(SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
-        Path dstFilePath = this.filenamePath;
-        int dstFileSize = (int)Files.size(dstFilePath); // MAX 2.14 GB !!!
-        InputStream inputData = Files.newInputStream(dstFilePath); // input file stream
+        if (encKey == null) {
+            throw new InvalidKeyException("encryption key cannot be null");
+        }
+        Path inputFilePath = this.filenamePath;
+        int dstFileSize = (int)Files.size(inputFilePath); // MAX 2.14 GB !!!
+        InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
         String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
-        // TODO: filename should be only the originalFilename
-        this.decryptContent("decrypted_" + originalFilename, inputData, dstFileSize);
+        try {
+            // TODO: filename should be only the originalFilename
+            this.decryptContent("decrypted_" + originalFilename, inputData, dstFileSize);
+        } catch (Exception e) {
+            Files.deleteIfExists(Path.of(this.path.toString(), "decrypted_" + originalFilename));
+            throw e;
+        }
 
         this.encrypted = false;
 
