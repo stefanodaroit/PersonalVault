@@ -1,5 +1,6 @@
 package app.core;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -9,6 +10,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 import javax.crypto.Mac;
@@ -410,6 +412,23 @@ public class Vault {
     }
 
     return macResult;
+  }
+
+  public static Vault importVault(File dir) throws InvalidConfigurationException, IOException {
+    // Check if a vault configuration file is present
+    List<Path> path = Files.find(Paths.get(dir.getAbsolutePath()), 1, (p, attr) -> p.getFileName().toString().endsWith(CONF_FILE_EXT)).toList();
+    
+    // If absent or multiple files throw error
+    if (path.size() != 1) {
+      throw new InvalidConfigurationException();
+    }   
+    
+    // Get UUID from vault
+    String vaultFilename = path.get(0).getFileName().toString();
+    vaultFilename = vaultFilename.substring(0, vaultFilename.length() - CONF_FILE_EXT.length());
+
+    // Create vault with obtained parameters and add to the list view
+    return new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
   }
 
   public UUID getVid() {

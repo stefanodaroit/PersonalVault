@@ -62,6 +62,7 @@ public class NewVaultStage extends Stage {
     final Label lbl = new Label("Set a name for the new vault");
     final TextField nameTxtFld = new TextField(this.vaultName);
     nameTxtFld.textProperty().addListener((observable, oldValue, newValue) -> {
+      // Avoid to input invalid characters
       if (!(newValue.length() == 0 || newValue.matches(VAULT_NAME_RGX))) {
         nameTxtFld.setText(oldValue);
       }
@@ -109,12 +110,13 @@ public class NewVaultStage extends Stage {
 
     final Button locationBtn = new Button("Choose Location");
     locationBtn.setOnAction(event -> {
+      // Get selected directory
       File dir = directoryChooser.showDialog(this);
       if (dir == null) { 
         System.out.println("No location selected.");
         return;
       }
-
+      // Set location label
       this.vaultPath = dir.getAbsolutePath();
       location.setText(this.vaultPath);
     });
@@ -133,6 +135,7 @@ public class NewVaultStage extends Stage {
 
     final Button nextBtn = new Button(NEXT);
     nextBtn.setOnAction(event -> { 
+      // Assure that the user selected a path
       if (this.vaultPath.length() != 0) {
         this.setScene(setPasswordScene());
       } else {
@@ -186,7 +189,7 @@ public class NewVaultStage extends Stage {
       } catch (InvalidPasswordException e) {
         message = e.getMessage();
       }
-      
+      // Set the label colors to highlight policy miscompliances
       for (int i = 1; i < statusPsw.length; i++) {
         statusPsw[i].setTextFill(message.contains(PSW_EXCEPTION[i-1]) ? Color.RED : Color.GREEN);
       }
@@ -208,6 +211,7 @@ public class NewVaultStage extends Stage {
 
     final Button createBtn = new Button("Create Vault");
     createBtn.setOnAction(event -> {
+      // Check if the passwords are equal
       if (!pswFld.getText().equals(pswFld2.getText())) {
         new Alert(AlertType.WARNING, "Passwords entered are different!", ButtonType.OK).show();
         return;
@@ -215,6 +219,7 @@ public class NewVaultStage extends Stage {
 
       this.vaultPsw = pswFld.getText();
       
+      // Create vault and add to the listview
       try {
         Vault v = new Vault(this.vaultName, this.vaultPath, this.vaultPsw);
         this.listVaultView.getItems().add(v);
