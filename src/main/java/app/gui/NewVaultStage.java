@@ -223,6 +223,7 @@ public class NewVaultStage extends Stage {
       try {
         Vault v = new Vault(this.vaultName, this.vaultPath, this.vaultPsw);
         this.listVaultView.getItems().add(v);
+        PersonalVault.savePaths();
         this.close();
       } catch (InvalidPasswordException e) {
         new Alert(AlertType.ERROR, "Invalid Password", ButtonType.OK).show();

@@ -431,6 +431,14 @@ public class Vault {
     return new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
   }
 
+  // Overriding equals() to compare two Complex objects
+  @Override
+  public boolean equals(Object o) {
+    if(((Vault) o).getStoragePath().equals(this.getStoragePath()))
+      return true;
+    return false;
+  }
+
   public UUID getVid() {
     return this.vid;
   }

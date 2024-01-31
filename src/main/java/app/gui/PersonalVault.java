@@ -1,17 +1,8 @@
 package app.gui;
 
-import app.core.KeyDerivator;
-import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.Vault;
-import app.core.Vault.InternalException;
 import app.core.Vault.InvalidConfigurationException;
-import app.core.Vault.WrongPasswordException;
-
 import javafx.application.Application;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -23,7 +14,6 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.PasswordField;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.Border;
@@ -33,7 +23,6 @@ import javafx.scene.layout.BorderStrokeStyle;
 import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -42,12 +31,26 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.security.InvalidKeyException;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
+import java.util.Scanner;
 import java.util.UUID;
 
 
@@ -57,13 +60,13 @@ public class PersonalVault extends Application {
   private final static String SRC = System.getProperty("user.home");
   private final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
   
-  private ListView<Vault> listVaultView = new ListView<Vault>();
+  private static ListView<Vault> listVaultView = new ListView<Vault>();
   private BorderPane borderPane = new BorderPane();
   static HashMap<Vault, Button> newVaults = new HashMap<Vault, Button>();
   static VBox rightPart = new VBox();  
 
   @Override
-  public void start(Stage primaryStage) {
+  public void start(Stage primaryStage){
     // Top panel
     HBox topPanel = new HBox();
     topPanel.setPrefSize(WIDTH, HEIGHT * 0.05);
@@ -106,6 +109,7 @@ public class PersonalVault extends Application {
 
   /**
    * Create the right box importing the vaults from a configuration file
+   * 
    */
   public VBox getVaultListBox() {
     final double CELLSIZE = 80.0;
@@ -130,7 +134,20 @@ public class PersonalVault extends Application {
       borderPane.setCenter(new ManageVault(newValue));
     });
     
-    // TODO configuration file with list of vaults
+
+    // Add all vaults
+    List<String> paths = readPaths();
+    for(String path: paths){
+      File f = new File(path);
+      try {
+        Vault v = Vault.importVault(f);
+        listVaultView.getItems().add(v);
+      } catch (InvalidConfigurationException e) {
+        new Alert(AlertType.ERROR, "Cannot import " + f + ": configuration file invalid or absent",   ButtonType.OK).show();
+      } catch (IOException e) {
+        new Alert(AlertType.ERROR, "Cannot import " + f + ": error while reading configuration file", ButtonType.OK).show();
+      }
+    }
 
     VBox leftPanel = new VBox(listVaultView);
     leftPanel.setBorder(BORDER);
@@ -170,8 +187,13 @@ public class PersonalVault extends Application {
       
       try {
         Vault v = Vault.importVault(dir);
-        // TODO avoid double import
-        listVaultView.getItems().add(v);
+        if(listVaultView.getItems().contains(v)){
+          new Alert(AlertType.ERROR, "Cannot import " + dir + ": the folder has already been imported", ButtonType.OK).show();
+        } else {
+          listVaultView.getItems().add(v);
+          savePaths();
+        }
+        
       } catch (IOException e) {
         new Alert(AlertType.ERROR, "Cannot import " + dir + ": error while reading configuration file", ButtonType.OK).show();
       } catch (InvalidConfigurationException e) {
@@ -181,6 +203,47 @@ public class PersonalVault extends Application {
 
     return importBtn;
   } 
+
+  /**
+   * Save all the vault paths into a file
+   * @throws IOException
+   */
+  public static void savePaths() throws IOException{
+    String pathsToSave = "";
+    for(Vault v: listVaultView.getItems()){
+      pathsToSave = pathsToSave + (v.getStoragePath()+"\n");
+    }
+
+    try {
+      FileWriter myWriter = new FileWriter(SRC + "/paths.txt");
+      myWriter.write(pathsToSave);
+      myWriter.close();
+    } catch (IOException e) {
+      System.out.println(e.getMessage());
+    }
+    
+  }
+
+  /**
+   * Read the path of the file
+   * @return
+   */
+  private List<String> readPaths() {
+    List<String> paths = new ArrayList<>();
+    try {
+      File myObj = new File(SRC + "/paths.txt");
+      Scanner myReader = new Scanner(myObj);
+      while (myReader.hasNextLine()) {
+        paths.add(myReader.nextLine());
+      }
+      myReader.close();
+    } catch (FileNotFoundException e) {
+      System.out.println(e.getMessage());
+    }
+
+    return paths;
+  }
+  
 
   // private static void changePsw(final Vault v){
   //   final Stage primaryStage = new Stage();
