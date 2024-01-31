@@ -6,7 +6,6 @@ import app.core.Vault;
 import app.core.Vault.InternalException;
 import app.core.Vault.InvalidConfigurationException;
 import app.core.Vault.WrongPasswordException;
-import static app.core.Constants.CONF_FILE_EXT;
 
 import javafx.application.Application;
 import javafx.beans.value.ChangeListener;
@@ -54,11 +53,12 @@ import java.util.UUID;
 
 public class PersonalVault extends Application {
 
-  private final static int WIDTH = 1000, HEIGHT = 700;
+  private final static double WIDTH = 1000, HEIGHT = 700, SPACING = 10;
+  private final static String SRC = System.getProperty("user.home");
   private final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
   
-  private static ListView<Vault> listVaultView = new ListView<Vault>();
-  static BorderPane borderPane = new BorderPane();
+  private ListView<Vault> listVaultView = new ListView<Vault>();
+  private BorderPane borderPane = new BorderPane();
   static HashMap<Vault, Button> newVaults = new HashMap<Vault, Button>();
   static VBox rightPart = new VBox();  
 
@@ -81,14 +81,14 @@ public class PersonalVault extends Application {
     // Bottom panel
     HBox bottomPanel = new HBox();
     bottomPanel.setAlignment(Pos.CENTER);
-    bottomPanel.setSpacing(10);
+    bottomPanel.setSpacing(SPACING);
     bottomPanel.setPrefSize(WIDTH, HEIGHT * 0.05);
     bottomPanel.getChildren().addAll(newVaultBtn(), importVaultBtn(primaryStage));
 
     // Push the different panels in the main layout
     borderPane.setTop(topPanel);
     borderPane.setLeft(getVaultListBox());
-    borderPane.setRight(rightPanel);
+    borderPane.setCenter(rightPanel);
     borderPane.setBottom(bottomPanel);
     Scene scene = new Scene(borderPane);
 
@@ -126,6 +126,9 @@ public class PersonalVault extends Application {
         }
       };
     });
+    listVaultView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+      borderPane.setCenter(new ManageVault(newValue));
+    });
     
     // TODO configuration file with list of vaults
 
@@ -152,7 +155,8 @@ public class PersonalVault extends Application {
    */
   public Button importVaultBtn(Stage stage) {
     DirectoryChooser directoryChooser = new DirectoryChooser();
-    directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+    directoryChooser.setTitle("Select Vault to Import");
+    directoryChooser.setInitialDirectory(new File(SRC));
     
     // Create button and set handler
     Button importBtn = new Button("Import Vault"); 
@@ -165,21 +169,7 @@ public class PersonalVault extends Application {
       }
       
       try {
-        // Check if a vault configuration file is present
-        List<Path> path = Files.find(Paths.get(dir.getAbsolutePath()), 1, (p, attr) -> p.getFileName().toString().endsWith(CONF_FILE_EXT)).toList();
-        
-        // If absent or multiple files throw error
-        if (path.size() != 1) {
-          throw new InvalidConfigurationException();
-        }   
-        
-        // Get UUID from vault
-        String vaultFilename = path.get(0).getFileName().toString();
-        vaultFilename = vaultFilename.substring(0, vaultFilename.length() - CONF_FILE_EXT.length());
-
-        // Create vault with obtained parameters and add to the list view
-        Vault v = new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
-        
+        Vault v = Vault.importVault(dir);
         // TODO avoid double import
         listVaultView.getItems().add(v);
       } catch (IOException e) {
@@ -192,271 +182,212 @@ public class PersonalVault extends Application {
     return importBtn;
   } 
 
-  public static void addNewVault(final Vault newVault){
+  // private static void changePsw(final Vault v){
+  //   final Stage primaryStage = new Stage();
+  //   primaryStage.setTitle("Change Password");
 
-    Button vault = new Button(newVault.getName() + "\n" + newVault.getStoragePath());
-    vault.setWrapText(true);
-    vault.setMaxWidth(WIDTH * 0.4);
-    
-    newVaults.put(newVault, vault);
+  //   Label oldPassword = new Label("Enter the current password for " + v.getName());
+  //   final PasswordField oldPasswordField = new PasswordField();
 
-    VBox vaultButtons = new VBox();
+  //   Label newPassword = new Label("Enter a new password");
+  //   final PasswordField newPasswordField = new PasswordField();
 
-    for(final Vault v: newVaults.keySet()){
-      vaultButtons.getChildren().addAll(newVaults.get(v));
-    }
+  //   Label newPasswordRe = new Label("Confirm the new password");
+  //   final PasswordField newPasswordFieldRe = new PasswordField();
 
-    addUnlockOptions();
-    
-    borderPane.setLeft(vaultButtons);
-  }
+  //   final Label[] statusPsw = {new Label("The password must contain at least 12 characters"),
+  //                                   new Label("The password must contain a maximum of 64 characters"),
+  //                                   new Label("The password must contain at least one special character"),
+  //                                   new Label("The password must contain at least one upper case character"),
+  //                                   new Label("The password must contain at least one number"),
+  //                                   new Label("The password must contain at least one lower case character")};
 
-  private static void addUnlockOptions(){
+  //   for(int i=0; i < statusPsw.length; i++){
+  //       statusPsw[i].setTextFill(Color.RED);
+  //   }
 
-    for(final Vault v: newVaults.keySet()){
-      
-      // Handle bottomButton click event without lambda expression
-      newVaults.get(v).setOnAction(new EventHandler<ActionEvent>() {
-        @Override
-        public void handle(ActionEvent event) {
-          rightPart = new VBox();
-
-          Label label = new Label(v.getName() + "\n" + v.getStoragePath());
-          Button unlockButton = new Button("Unlock");
-          Button changePswButton = new Button("Change Password");
-
-          unlockButton.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-              unlockVault(v);     
-            }
-          });
-
-          changePswButton.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-              changePsw(v);     
-            }
-          });
+  //   newPasswordField.textProperty().addListener(new ChangeListener<String>() {
+  //     @Override
+  //     public void changed(ObservableValue<? extends String> observable, String oldValue, String newValue) {
+  //         String message = "";
+  //         try {
+  //             KeyDerivator.validatePassword(newValue);
+  //         } catch (InvalidPasswordException e) {
+  //             message = e.getMessage();
+  //         }
           
-          rightPart.getChildren().addAll(label, unlockButton, changePswButton);
-          rightPart.setAlignment(Pos.TOP_LEFT);
-          borderPane.setRight(rightPart);
-        }
-      }); 
-    }
-    
-  }
+  //         for(int i=0; i < statusPsw.length; i++){
+  //             if(!message.contains(statusPsw[i].getText()))
+  //                 statusPsw[i].setTextFill(Color.GREEN);
+  //             else
+  //                 statusPsw[i].setTextFill(Color.RED);
+  //         }
+  //     }
+  //   });
 
-  private static void changePsw(final Vault v){
-    final Stage primaryStage = new Stage();
-    primaryStage.setTitle("Change Password");
+  //   // Create a button for navigating back to the name input page
+  //   Button cancelPageButton = new Button("Cancel");
+  //   cancelPageButton.setOnAction(new EventHandler<ActionEvent>() {
+  //       @Override
+  //       public void handle(ActionEvent event) {
+  //           primaryStage.close();
+  //       }
+  //   });
 
-    Label oldPassword = new Label("Enter the current password for " + v.getName());
-    final PasswordField oldPasswordField = new PasswordField();
-
-    Label newPassword = new Label("Enter a new password");
-    final PasswordField newPasswordField = new PasswordField();
-
-    Label newPasswordRe = new Label("Confirm the new password");
-    final PasswordField newPasswordFieldRe = new PasswordField();
-
-    final Label[] statusPsw = {new Label("The password must contain at least 12 characters"),
-                                    new Label("The password must contain a maximum of 64 characters"),
-                                    new Label("The password must contain at least one special character"),
-                                    new Label("The password must contain at least one upper case character"),
-                                    new Label("The password must contain at least one number"),
-                                    new Label("The password must contain at least one lower case character")};
-
-    for(int i=0; i < statusPsw.length; i++){
-        statusPsw[i].setTextFill(Color.RED);
-    }
-
-    newPasswordField.textProperty().addListener(new ChangeListener<String>() {
-      @Override
-      public void changed(ObservableValue<? extends String> observable, String oldValue, String newValue) {
-          String message = "";
-          try {
-              KeyDerivator.validatePassword(newValue);
-          } catch (InvalidPasswordException e) {
-              message = e.getMessage();
-          }
-          
-          for(int i=0; i < statusPsw.length; i++){
-              if(!message.contains(statusPsw[i].getText()))
-                  statusPsw[i].setTextFill(Color.GREEN);
-              else
-                  statusPsw[i].setTextFill(Color.RED);
-          }
-      }
-    });
-
-    // Create a button for navigating back to the name input page
-    Button cancelPageButton = new Button("Cancel");
-    cancelPageButton.setOnAction(new EventHandler<ActionEvent>() {
-        @Override
-        public void handle(ActionEvent event) {
-            primaryStage.close();
-        }
-    });
-
-    // Create a button for navigating back to the name input page
-    Button changePswButton = new Button("Change");
-    changePswButton.setOnAction(new EventHandler<ActionEvent>() {
-        @Override
-        public void handle(ActionEvent event) {
-            if(newPasswordField.getText().equals(newPasswordFieldRe.getText())){
-              try{
-                v.changePsw(oldPasswordField.getText(), newPasswordField.getText());
-                Alert alert = new Alert(AlertType.CONFIRMATION, "The new password is setted", ButtonType.OK);
-                alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-                alert.show();
-                primaryStage.close();
-              } catch (InvalidPasswordException e){
-                Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
-                alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-                alert.show();
-              } catch (WrongPasswordException e) {
-                Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
-                alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-                alert.show();
-              } catch (InternalException e) {
-                // TODO Auto-generated catch block
-                e.getMessage();
-              } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.getMessage();
-              }
+  //   // Create a button for navigating back to the name input page
+  //   Button changePswButton = new Button("Change");
+  //   changePswButton.setOnAction(new EventHandler<ActionEvent>() {
+  //       @Override
+  //       public void handle(ActionEvent event) {
+  //           if(newPasswordField.getText().equals(newPasswordFieldRe.getText())){
+  //             try{
+  //               v.changePsw(oldPasswordField.getText(), newPasswordField.getText());
+  //               Alert alert = new Alert(AlertType.CONFIRMATION, "The new password is setted", ButtonType.OK);
+  //               alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+  //               alert.show();
+  //               primaryStage.close();
+  //             } catch (InvalidPasswordException e){
+  //               Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
+  //               alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+  //               alert.show();
+  //             } catch (WrongPasswordException e) {
+  //               Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
+  //               alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+  //               alert.show();
+  //             } catch (InternalException e) {
+  //               e.getMessage();
+  //             } catch (IOException e) {
+  //               e.getMessage();
+  //             }
               
-            } else {
-              Alert alert = new Alert(AlertType.ERROR, "The two passwords must be equal", ButtonType.OK);
-              alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-              alert.show();
-            }
+  //           } else {
+  //             Alert alert = new Alert(AlertType.ERROR, "The two passwords must be equal", ButtonType.OK);
+  //             alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+  //             alert.show();
+  //           }
             
-        }
-    });
+  //       }
+  //   });
 
-    // Create a layout 
-    VBox layout = new VBox(10);
-    layout.getChildren().addAll(oldPassword, oldPasswordField, newPassword, newPasswordField);
-    layout.getChildren().addAll(newPasswordRe, newPasswordFieldRe);
-    layout.getChildren().addAll(statusPsw);
-    layout.setAlignment(Pos.CENTER);
+  //   // Create a layout 
+  //   VBox layout = new VBox(SPACING);
+  //   layout.getChildren().addAll(oldPassword, oldPasswordField, newPassword, newPasswordField);
+  //   layout.getChildren().addAll(newPasswordRe, newPasswordFieldRe);
+  //   layout.getChildren().addAll(statusPsw);
+  //   layout.setAlignment(Pos.CENTER);
 
-    HBox buttons = new HBox();
-    buttons.getChildren().addAll(cancelPageButton, changePswButton);
+  //   HBox buttons = new HBox();
+  //   buttons.getChildren().addAll(cancelPageButton, changePswButton);
 
-    // Create the main layout
-    BorderPane borderPane = new BorderPane();
-    borderPane.setCenter(layout);
-    borderPane.setBottom(buttons);
+  //   // Create the main layout
+  //   BorderPane borderPane = new BorderPane();
+  //   borderPane.setCenter(layout);
+  //   borderPane.setBottom(buttons);
 
-    // Set the new scene for the new stage
-    Scene newPageScene = new Scene(borderPane, 500, 400);
-    primaryStage.setScene(newPageScene);
+  //   // Set the new scene for the new stage
+  //   Scene newPageScene = new Scene(borderPane, 500, 400);
+  //   primaryStage.setScene(newPageScene);
 
-    // Show the new stage
-    primaryStage.show();
-  }
+  //   // Show the new stage
+  //   primaryStage.show();
+  // }
 
-  private static void unlockVault(final Vault v){
-    final Stage primaryStage = new Stage();
-    primaryStage.setTitle("Unlock Vault");
+  // private static void unlockVault(final Vault v){
+  //   final Stage primaryStage = new Stage();
+  //   primaryStage.setTitle("Unlock Vault");
 
-    Label password = new Label("Enter password for " + v.getName());
-    final PasswordField passwordField = new PasswordField();
+  //   Label password = new Label("Enter password for " + v.getName());
+  //   final PasswordField passwordField = new PasswordField();
 
-    // Create a button for cancel input page
-    Button cancelPageButton = new Button("Cancel");
-    cancelPageButton.setOnAction(new EventHandler<ActionEvent>() {
-        @Override
-        public void handle(ActionEvent event) {
-            primaryStage.close();
-        }
-    });
+  //   // Create a button for cancel input page
+  //   Button cancelPageButton = new Button("Cancel");
+  //   cancelPageButton.setOnAction(new EventHandler<ActionEvent>() {
+  //       @Override
+  //       public void handle(ActionEvent event) {
+  //           primaryStage.close();
+  //       }
+  //   });
 
-    // Create a button for cancel input page
-    Button unlockPageButton = new Button("Unlock");
-    unlockPageButton.setOnAction(new EventHandler<ActionEvent>() {
-        @Override
-        public void handle(ActionEvent event) {
-          try {
-            v.unlock(passwordField.getText());
-            Alert alert = new Alert(AlertType.CONFIRMATION, "Unlocked successfully!", ButtonType.OK);
-            alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-            alert.show();
-            primaryStage.close();
-            revealDrive(v);
-          } catch (InvalidConfigurationException e) {
-            // TODO Auto-generated catch block
-            e.getMessage();
-          } catch (WrongPasswordException e) {
-            Alert alert = new Alert(AlertType.WARNING, e.getMessage(), ButtonType.OK);
-            alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-            alert.show();
-          } catch (InternalException e) {
-            e.getMessage();
-          }
-        }
-    });
+  //   // Create a button for cancel input page
+  //   Button unlockPageButton = new Button("Unlock");
+  //   unlockPageButton.setOnAction(new EventHandler<ActionEvent>() {
+  //       @Override
+  //       public void handle(ActionEvent event) {
+  //         try {
+  //           v.unlock(passwordField.getText());
+  //           Alert alert = new Alert(AlertType.CONFIRMATION, "Unlocked successfully!", ButtonType.OK);
+  //           alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+  //           alert.show();
+  //           primaryStage.close();
+  //           revealDrive(v);
+  //         } catch (InvalidConfigurationException e) {
+  //           e.getMessage();
+  //         } catch (WrongPasswordException e) {
+  //           Alert alert = new Alert(AlertType.WARNING, e.getMessage(), ButtonType.OK);
+  //           alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+  //           alert.show();
+  //         } catch (InternalException e) {
+  //           e.getMessage();
+  //         }
+  //       }
+  //   });
 
-    // Create a layout 
-    VBox layout = new VBox(10);
-    layout.getChildren().addAll(password, passwordField);
-    layout.setAlignment(Pos.CENTER);
+  //   // Create a layout 
+  //   VBox layout = new VBox(SPACING);
+  //   layout.getChildren().addAll(password, passwordField);
+  //   layout.setAlignment(Pos.CENTER);
 
-    // Create a layout 
-    HBox buttons = new HBox(10);
-    buttons.getChildren().addAll(cancelPageButton, unlockPageButton);
-    buttons.setAlignment(Pos.CENTER);
+  //   // Create a layout 
+  //   HBox buttons = new HBox(SPACING);
+  //   buttons.getChildren().addAll(cancelPageButton, unlockPageButton);
+  //   buttons.setAlignment(Pos.CENTER);
 
 
-    // Create the main layout
-    BorderPane borderPaneNew = new BorderPane();
-    borderPaneNew.setTop(layout);
-    borderPaneNew.setBottom(buttons);
+  //   // Create the main layout
+  //   BorderPane borderPaneNew = new BorderPane();
+  //   borderPaneNew.setTop(layout);
+  //   borderPaneNew.setBottom(buttons);
 
-    // Set the new scene for the new stage
-    Scene newPageScene = new Scene(borderPaneNew, 500, 400);
-    primaryStage.setScene(newPageScene);
+  //   // Set the new scene for the new stage
+  //   Scene newPageScene = new Scene(borderPaneNew, 500, 400);
+  //   primaryStage.setScene(newPageScene);
 
-    // Show the new stage
-    primaryStage.show();
-  }
+  //   // Show the new stage
+  //   primaryStage.show();
+  // }
 
-  private static void revealDrive(final Vault v){
-    Label label = new Label(v.getName() + "\n" + v.getStoragePath());
-    Label revealLabel = new Label("Your vault's contants are accessible here:");
-    Button revealButton = new Button("Reveal Vault");
-    Button lockButton = new Button("Lock");
+  // private static void revealDrive(final Vault v){
+  //   Label label = new Label(v.getName() + "\n" + v.getStoragePath());
+  //   Label revealLabel = new Label("Your vault's contants are accessible here:");
+  //   Button revealButton = new Button("Reveal Vault");
+  //   Button lockButton = new Button("Lock");
 
-    revealButton.setOnAction(new EventHandler<ActionEvent>() {
-      @Override
-      public void handle(ActionEvent event) {
-        //TODO
+  //   revealButton.setOnAction(new EventHandler<ActionEvent>() {
+  //     @Override
+  //     public void handle(ActionEvent event) {
+  //       //TODO
   
-      }
-    });
+  //     }
+  //   });
 
-    lockButton.setOnAction(new EventHandler<ActionEvent>() {
-      @Override
-      public void handle(ActionEvent event) {
-        //v.lock();
-        rightPart = new VBox();
-        borderPane.setRight(rightPart);
-      }
-    });
+  //   lockButton.setOnAction(new EventHandler<ActionEvent>() {
+  //     @Override
+  //     public void handle(ActionEvent event) {
+  //       //v.lock();
+  //       rightPart = new VBox();
+  //       borderPane.setRight(rightPart);
+  //     }
+  //   });
 
-    rightPart = new VBox();
-    rightPart.getChildren().addAll(label, revealLabel, revealButton, lockButton);
-    rightPart.setAlignment(Pos.TOP_LEFT);
+  //   rightPart = new VBox();
+  //   rightPart.getChildren().addAll(label, revealLabel, revealButton, lockButton);
+  //   rightPart.setAlignment(Pos.TOP_LEFT);
     
 
-    borderPane.setRight(rightPart);
+  //   borderPane.setRight(rightPart);
     
 
-  }
+  // }
 
 
 }
