@@ -11,7 +11,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Base64;
 
 public class File {
@@ -26,9 +25,9 @@ public class File {
     private final Cipher c;
 
     private static final int IVLEN = 12; // bytes
-    private static final int CHUNK_SIZE = 64; // bytes
-    private static final int KEY_SIZE = 256; // bits
-    private static final int KEY_SIZE_ENCODED = KEY_SIZE / 8; // bytes
+    private static final int CHUNK_SIZE = 65536; // bytes 2^16
+    private static final int KEY_SIZE_BITS = 256; // bits
+    private static final int KEY_SIZE = KEY_SIZE_BITS / 8; // bytes
     private static final int FILENAME_MAX_SIZE = 256; // bytes
     private static final String KEY_GEN_ALGO = "AES";
 
@@ -98,30 +97,30 @@ public class File {
      */
     private byte[] encryptHeader(SecretKey encKey, StringBuilder encFilename) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         KeyGenerator keygen = KeyGenerator.getInstance(KEY_GEN_ALGO);
-        keygen.init(KEY_SIZE, this.gen); // bits
+        keygen.init(KEY_SIZE_BITS, this.gen); // bits
         this.fileKey = keygen.generateKey(); // used to encrypt content later
         byte[] encodedKey = this.fileKey.getEncoded();
-        if (encodedKey.length != KEY_SIZE_ENCODED) {
-            throw new InvalidKeyException("encodedKey should be " + KEY_SIZE_ENCODED + ", not " + encodedKey.length + "?");
+        if (encodedKey.length != KEY_SIZE) {
+            throw new InvalidKeyException("encodedKey should be " + KEY_SIZE + ", not " + encodedKey.length + "?");
         }
 
         this.gen.nextBytes(this.headerIV);
         GCMParameterSpec spec = new GCMParameterSpec(128, headerIV);
         this.c.init(Cipher.ENCRYPT_MODE, encKey, spec, this.gen);
 
-        byte[] toEnc = new byte[KEY_SIZE_ENCODED + 1 + FILENAME_MAX_SIZE];
+        byte[] toEnc = new byte[KEY_SIZE + 1 + FILENAME_MAX_SIZE];
         // first part is the fileKey, needed to decrypt content
-        System.arraycopy(encodedKey, 0, toEnc, 0, KEY_SIZE_ENCODED);
+        System.arraycopy(encodedKey, 0, toEnc, 0, KEY_SIZE);
 
         byte[] filenameBytes = this.filename.getBytes();
         if (filenameBytes.length > FILENAME_MAX_SIZE) {
             throw new IllegalBlockSizeException("filename should be <= " + FILENAME_MAX_SIZE + " bytes, instead it is" + filenameBytes.length + " bytes long");
         }
         // second part is the plain filename length expressed in a single byte
-        toEnc[KEY_SIZE_ENCODED] = (byte) filenameBytes.length;
+        toEnc[KEY_SIZE] = (byte) filenameBytes.length;
 
         // third part is the filename value
-        System.arraycopy(filenameBytes, 0, toEnc, KEY_SIZE_ENCODED + 1, filenameBytes.length);
+        System.arraycopy(filenameBytes, 0, toEnc, KEY_SIZE + 1, filenameBytes.length);
 
         byte[] encHeader = this.c.doFinal(toEnc);
 
@@ -200,7 +199,7 @@ public class File {
 
         this.encrypted = false;
 
-        return originalFilename;
+        return "decrypted_" + originalFilename;
     }
 
     /**
@@ -216,7 +215,7 @@ public class File {
      * @throws IOException
      */
     private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
-        int headerFullSize = IVLEN + KEY_SIZE_ENCODED + 1 + FILENAME_MAX_SIZE + 16; // last 16 bytes are GCM authentication tag
+        int headerFullSize = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + 16; // last 16 bytes are GCM authentication tag
         byte[] encrypted = new byte[headerFullSize];
         int _inputBytesRead = inputData.read(encrypted);
 
@@ -231,17 +230,17 @@ public class File {
 
         byte[] headerContent = this.c.doFinal(ciphertext);
 
-        byte[] fKey = new byte[KEY_SIZE_ENCODED];
+        byte[] fKey = new byte[KEY_SIZE];
         // first part of ciphertext is the fileKey
-        System.arraycopy(headerContent, 0, fKey, 0, KEY_SIZE_ENCODED);
+        System.arraycopy(headerContent, 0, fKey, 0, KEY_SIZE);
         this.fileKey = new SecretKeySpec(fKey, 0, fKey.length, KEY_GEN_ALGO);
 
         // second part is the plain filename length expressed in a byte
-        int filenameSize = headerContent[KEY_SIZE_ENCODED];
+        int filenameSize = headerContent[KEY_SIZE];
 
         // third part is the filename value
         byte[] filename = new byte[filenameSize];
-        System.arraycopy(headerContent, KEY_SIZE_ENCODED + 1, filename, 0, filenameSize);
+        System.arraycopy(headerContent, KEY_SIZE + 1, filename, 0, filenameSize);
 
         String filenameStr = new String(filename, StandardCharsets.UTF_8);
         return filenameStr;
@@ -260,7 +259,7 @@ public class File {
      */
     private void decryptContent(String outputFilename, InputStream fileData, int inputSize) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         outputFilename = Path.of(outputFilename).normalize().getFileName().toString();
-        final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE_ENCODED + 1 + FILENAME_MAX_SIZE + 16;
+        final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + 16;
 
         byte[] contentData = new byte[inputSize - HEADER_FULL_SIZE];
         int _fileBytesRead = fileData.read(contentData);
