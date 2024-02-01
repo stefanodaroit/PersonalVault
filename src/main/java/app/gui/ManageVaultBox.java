@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 
 import app.core.Vault;
 import app.core.Vault.InternalException;
@@ -19,6 +20,7 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.PasswordField;
@@ -33,20 +35,22 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-public class ManageVault extends VBox {
+public class ManageVaultBox extends VBox {
 
   private static final double WIDTH = 300, HEIGHT = 200, SPACING = 10, PADDING = 10;
   
   private Vault vault;
 
   private Stage primaryStage;
+  private ListView<Vault> listView;
   private FileSystemTreeView treeView;
   private TreeItem<String> selectedItem;
 
-  public ManageVault(Stage stage, Vault vault) {
+  public ManageVaultBox(Stage stage, ListView<Vault> listView, Vault vault) {
     super();
     
     this.primaryStage = stage;
+    this.listView = listView;
     this.vault = vault;
     this.selectedItem = null;
 
@@ -160,10 +164,30 @@ public class ManageVault extends VBox {
     
     final Button removeBtn = new Button("Remove");
     removeBtn.setOnAction(e -> {
+      if (this.selectedItem == null) { return; } 
+      
+      Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to remove " + this.selectedItem.getValue() + "?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
+      if (response.get() != ButtonType.OK) { return; }
+
       this.treeView.remove(this.selectedItem);
     });
 
-    final HBox bottomBox = new HBox(SPACING, addBtn, removeBtn);
+    final Button clearBtn = new Button("Clear");
+    clearBtn.setOnAction(e -> {
+      Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to delete the vault content?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
+      if (response.get() != ButtonType.OK) { return; }
+      this.treeView.clear();
+    });
+
+    final Button deleteBtn = new Button("Delete Vault");
+    deleteBtn.setOnAction(e -> {
+      Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to delete the vault " + this.vault.getName() +"?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
+      if (response.get() != ButtonType.OK) { return; }
+      this.listView.getItems().remove(this.vault);
+      PersonalVault.saveStoredVaults(this.listView.getItems());
+    });
+
+    final HBox bottomBox = new HBox(SPACING, addBtn, removeBtn, clearBtn, deleteBtn);
     bottomBox.setPadding(new Insets(10));
     bottomBox.setAlignment(Pos.CENTER);
 
@@ -172,7 +196,7 @@ public class ManageVault extends VBox {
   }
 
   private MenuItem addDirectoryBtn() {
-    final MenuItem addDir  = new MenuItem("Directory");
+    final MenuItem addDir = new MenuItem("Directory");
     
     DirectoryChooser dirChooser = new DirectoryChooser();
     dirChooser.setTitle("Select Directory to add");
