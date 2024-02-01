@@ -19,7 +19,6 @@ public class File {
     private final String filename; // "file.txt"
     private final Path filenamePath; // "./dir/dir2/file.txt"
     private final SecureRandom gen; // random bytes generator
-    private boolean encrypted; // flag
     private SecretKey fileKey; // used to encrypt the content
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
@@ -85,7 +84,6 @@ public class File {
         encryptedOutput.write(encContent);
 
         encryptedOutput.close();
-        this.encrypted = true;
 
         return encFilenameStr;
     }
@@ -212,8 +210,6 @@ public class File {
             Files.deleteIfExists(dstFilePath);
             throw e;
         }
-
-        this.encrypted = false;
 
         return dstFilePath.getFileName().toString();
     }
