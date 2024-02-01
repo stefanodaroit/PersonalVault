@@ -2,6 +2,8 @@ package app;
 
 import app.core.File;
 import app.core.KeyManager;
+import org.junit.BeforeClass;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -20,13 +22,26 @@ public class FileTest {
 
     private final KeyManager km = new KeyManager();
     private final Random r = new Random();
+    private final Path localPath = Path.of(".");
+    private static final Path dstTestPath = Path.of("./test");
+
+    // https://junit.org/junit4/javadoc/latest/org/junit/BeforeClass.html
+    @BeforeClass
+    public static void createTestFolder() throws IOException {
+        Files.createDirectory(dstTestPath);
+    }
+    // https://junit.org/junit4/javadoc/latest/org/junit/AfterClass.html
+    @AfterClass
+    public static void deleteTestFolder() throws IOException {
+        Files.delete(dstTestPath);
+    }
 
     private String createRandomFile() throws IOException {
         byte[] fileOutput = new byte[this.r.nextInt(1000000)];
         this.r.nextBytes(fileOutput);
 
         String filename = Base64.getUrlEncoder().encodeToString(fileOutput);
-        filename = filename.substring(0, Math.min(15, filename.length()));
+        filename = filename.substring(0, Math.min(this.r.nextInt(10, 50), filename.length()));
 
         Files.write(Path.of(filename), fileOutput);
         return filename;
@@ -64,9 +79,9 @@ public class FileTest {
             filename = createRandomFile();
 
             File fe = new File(".", filename);
-            fe.encrypt(null);
+            fe.encrypt(null, localPath);
         } finally {
-            Files.deleteIfExists(Path.of(".", filename));
+            Files.delete(Path.of(".", filename));
         }
     }
 
@@ -77,9 +92,9 @@ public class FileTest {
             filename = createRandomFile();
 
             File fe = new File(".", filename);
-            fe.decrypt(null);
+            fe.decrypt(null, dstTestPath);
         } finally {
-            Files.deleteIfExists(Path.of(".", filename));
+            Files.delete(Path.of(".", filename));
         }
     }
 
@@ -95,14 +110,14 @@ public class FileTest {
             SecretKey encKey1 = keygen.generateKey();
 
             File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey1);
+            encFilename = fe.encrypt(encKey1, localPath);
 
             SecretKey encKey2 = keygen.generateKey();
-            File fd = new File(".", encFilename);
-            String decFilename = fd.decrypt(encKey2); // should not start creating the file
+            File fd = new File(localPath.toString(), encFilename);
+            String decFilename = fd.decrypt(encKey2, dstTestPath); // should not start creating the file
         } finally {
-            Files.deleteIfExists(Path.of(".", filename));
-            Files.deleteIfExists(Path.of(".", encFilename));
+            Files.delete(Path.of(".", filename));
+            Files.delete(Path.of(localPath.toString(), encFilename));
         }
     }
 
@@ -115,17 +130,16 @@ public class FileTest {
         SecretKey encKey = keygen.generateKey();
 
         File fe = new File(".", filename);
-        String encFilename = fe.encrypt(encKey);
+        String encFilename = fe.encrypt(encKey, localPath);
         byte[] f1 = Files.readAllBytes(Path.of(filename));
 
-        File fd = new File(".", encFilename);
-        String decFilename = fd.decrypt(encKey);
-        byte[] f2 = Files.readAllBytes(Path.of(decFilename));
+        File fd = new File(localPath.toString(), encFilename);
+        String decFilename = fd.decrypt(encKey, dstTestPath);
+        byte[] f2 = Files.readAllBytes(Path.of(dstTestPath.toString(), decFilename));
 
-        // TODO: Implement deletion in File and remove from here
         Files.delete(Path.of(".", filename));
-        Files.delete(Path.of(".", encFilename));
-        Files.delete(Path.of(".", decFilename));
+        Files.delete(Path.of(localPath.toString(), encFilename));
+        Files.delete(Path.of(dstTestPath.toString(), decFilename));
 
         Assert.assertArrayEquals(f1, f2);
     }
@@ -142,10 +156,10 @@ public class FileTest {
             SecretKey encKey = keygen.generateKey();
 
             File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey);
+            encFilename = fe.encrypt(encKey, localPath);
 
             // overwrite encrypted file header byte
-            byte[] fb = Files.readAllBytes(Path.of(encFilename));
+            byte[] fb = Files.readAllBytes(Path.of(localPath.toString(), encFilename));
 
             // generate one different byte at an arbitrary position
             byte x;
@@ -153,14 +167,14 @@ public class FileTest {
                 x = (byte) this.r.nextInt();
             } while (x == fb[10]);
             fb[10] = x;
-            Files.write(Path.of(encFilename), fb);
+            Files.write(Path.of(localPath.toString(), encFilename), fb);
 
-            File fd = new File(".", encFilename);
+            File fd = new File(localPath.toString(), encFilename);
             // the header does not match, the file is not created
-            String decFilename = fd.decrypt(encKey);
+            String decFilename = fd.decrypt(encKey, dstTestPath);
         } finally {
             Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(".", encFilename));
+            Files.delete(Path.of(localPath.toString(), encFilename));
         }
     }
 
@@ -176,17 +190,17 @@ public class FileTest {
             SecretKey encKey = keygen.generateKey();
 
             File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey);
+            encFilename = fe.encrypt(encKey, localPath);
 
             Files.write(Path.of(encFilename), new byte[]{(byte) this.r.nextInt()}, StandardOpenOption.APPEND);
 
-            File fd = new File(".", encFilename);
+            File fd = new File(localPath.toString(), encFilename);
             // file is created because header bytes match,
             // but the content bytes does not match, so throw an exception. The under-the-hood file is deleted
-            String decFilename = fd.decrypt(encKey);
+            String decFilename = fd.decrypt(encKey, dstTestPath);
         } finally {
             Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(".", encFilename));
+            Files.delete(Path.of(localPath.toString(), encFilename));
         }
     }
 
@@ -203,15 +217,15 @@ public class FileTest {
             SecretKey encKey = keygen.generateKey();
 
             File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey);
+            encFilename = fe.encrypt(encKey, localPath);
 
-            File fd = new File(".", encFilename);
-            decFilename = fd.decrypt(encKey);
+            File fd = new File(localPath.toString(), encFilename);
+            decFilename = fd.decrypt(encKey, dstTestPath);
         } finally {
             // TODO: Implement deletion in File and remove from here
             Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(".", encFilename));
-            Files.delete(Path.of(".", decFilename));
+            Files.delete(Path.of(localPath.toString(), encFilename));
+            Files.delete(Path.of(dstTestPath.toString(), decFilename));
         }
 
         Assert.assertEquals(filename, decFilename);

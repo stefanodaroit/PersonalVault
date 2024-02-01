@@ -17,7 +17,7 @@ import static app.core.Constants.*;
 
 public class File {
 
-    private final Path path; // "./dir/dir2/"
+    private final Path folderPath; // "./dir/dir2/"
     private final String filename; // "file.txt"
     private final Path filenamePath; // "./dir/dir2/file.txt"
     private final SecureRandom gen; // random bytes generator
@@ -25,24 +25,22 @@ public class File {
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
 
-    // TODO: Delete files and keep encrypted/decrypted only
-
     /**
      * Instantiate a file operation
-     * @param path base directory
+     * @param folderPath base directory
      * @param filename name of the file to open
      * @throws IOException The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
-    public File(String path, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
-        if (path == null || filename == null) {
+    public File(String folderPath, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+        if (folderPath == null || filename == null) {
             throw new IOException("path and filename cannot be null");
         }
-        this.path = Path.of(path).normalize();
+        this.folderPath = Path.of(folderPath).normalize();
         this.filename = Path.of(filename).normalize().getFileName().toString();
 
-        this.filenamePath = Path.of(this.path.toString(), this.filename);
+        this.filenamePath = Path.of(this.folderPath.toString(), this.filename);
         if (!(new java.io.File(this.filenamePath.toString()).isFile())) {
             throw new IOException("Path '" + this.filenamePath + "' is not a file or not found");
         }
@@ -55,6 +53,7 @@ public class File {
     /**
      * Public method to encrypt the file
      * @param encKey key to use to encrypt the header
+     * @param dstFolderPath destination folder path of the output file
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
@@ -63,17 +62,18 @@ public class File {
      * @throws BadPaddingException
      * @throws IOException
      */
-    public String encrypt(SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
-        if (encKey == null) {
-            throw new InvalidKeyException("encryption key cannot be null");
-        }
+    public String encrypt(SecretKey encKey, Path dstFolderPath) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+        if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
+        if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
+
         StringBuilder encFilename = new StringBuilder();
 
         byte[] encHeader = this.encryptHeader(encKey, encFilename);
         byte[] encContent = this.encryptContent();
 
         String encFilenameStr = Path.of(encFilename.toString()).normalize().getFileName().toString();
-        OutputStream encryptedOutput = Files.newOutputStream(Path.of(this.path.toString(), encFilenameStr)); // encrypted file output
+        dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
+        OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encFilenameStr)); // encrypted file output
 
         encryptedOutput.write(encHeader);
         encryptedOutput.write(encContent);
@@ -180,6 +180,7 @@ public class File {
     /**
      * Public method to decrypt the file
      * @param encKey key to use to decrypt the header
+     * @param dstFolderPath destination folder path of the output file
      * @return the original plaintext filename
      * @throws InvalidAlgorithmParameterException
      * @throws IllegalBlockSizeException
@@ -187,18 +188,18 @@ public class File {
      * @throws InvalidKeyException
      * @throws IOException
      */
-    public String decrypt(SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
-        if (encKey == null) {
-            throw new InvalidKeyException("encryption key cannot be null");
-        }
+    public String decrypt(SecretKey encKey, Path dstFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
+        if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
+        if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
+
         Path inputFilePath = this.filenamePath;
         int dstFileSize = (int)Files.size(inputFilePath); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
         String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
 
-        // TODO: filename should be only the originalFilename
-        Path dstFilePath = Path.of(this.path.toString(), "decrypted_" + originalFilename).normalize();
+        dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
+        Path dstFilePath = Path.of(dstFolderPath.toString(), originalFilename).normalize();
         try {
             this.decryptContent(dstFilePath, inputData, dstFileSize);
         } catch (Exception e) {
