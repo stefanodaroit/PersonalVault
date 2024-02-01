@@ -412,6 +412,16 @@ public class Vault {
     return macResult;
   }
 
+  public void computeChecksum() throws IOException, VaultLockedException{
+    // Loop over the source directory content
+    Path srcDir = Paths.get(this.storagePath.toString());
+    for (Path file : Files.walk(srcDir).toList()) {
+      // Copy file considering the subdirectories
+      Path dest = file.subpath(srcDir.getNameCount() - 1, file.getNameCount());
+      System.out.println(dest.toString());
+    }
+  }
+
   public UUID getVid() {
     return this.vid;
   }
