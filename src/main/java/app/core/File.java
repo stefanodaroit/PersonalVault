@@ -29,6 +29,8 @@ public class File {
     private static final int KEY_SIZE = KEY_SIZE_BITS / 8; // bytes
     private static final int FILENAME_MAX_SIZE = 256; // bytes
     private static final String KEY_GEN_ALGO = "AES";
+    private static final int TAG_LEN_BITS = 128; // bits
+    private static final int TAG_LEN = TAG_LEN_BITS / 8; // bytes
 
     // TODO: Delete files and keep encrypted/decrypted only
 
@@ -109,7 +111,7 @@ public class File {
         }
 
         this.gen.nextBytes(this.headerIV);
-        GCMParameterSpec spec = new GCMParameterSpec(128, headerIV);
+        GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, headerIV);
         this.c.init(Cipher.ENCRYPT_MODE, encKey, spec, this.gen);
 
         byte[] toEnc = new byte[KEY_SIZE + 1 + FILENAME_MAX_SIZE];
@@ -160,7 +162,7 @@ public class File {
         int chunkIndex = 0;
         while ((bytesRead = is.read(buffer)) != -1) {
             this.gen.nextBytes(iv);
-            GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+            GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, iv);
             this.c.init(Cipher.ENCRYPT_MODE, this.fileKey, spec, this.gen);
 
             this.c.updateAAD(String.format("%d", chunkIndex).getBytes());
@@ -227,13 +229,13 @@ public class File {
      * @throws IOException
      */
     private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
-        int headerFullSize = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + 16; // last 16 bytes are GCM authentication tag
+        int headerFullSize = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + TAG_LEN; // last TAG_LEN bytes are GCM authentication tag
         byte[] encrypted = new byte[headerFullSize];
         int _inputBytesRead = inputData.read(encrypted);
 
         // first part of the full header data is the IV
         System.arraycopy(encrypted, 0, this.headerIV, 0, IVLEN);
-        GCMParameterSpec spec = new GCMParameterSpec(128, this.headerIV);
+        GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, this.headerIV);
         this.c.init(Cipher.DECRYPT_MODE, encKey, spec, this.gen);
 
         byte[] ciphertext = new byte[headerFullSize - IVLEN];
@@ -270,7 +272,7 @@ public class File {
      * @throws BadPaddingException
      */
     private void decryptContent(Path outputFilePath, InputStream fileData, int inputSize) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-        final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + 16;
+        final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + TAG_LEN;
 
         byte[] contentData = new byte[inputSize - HEADER_FULL_SIZE];
         int _fileBytesRead = fileData.read(contentData);
@@ -279,14 +281,14 @@ public class File {
         ByteArrayInputStream is = new ByteArrayInputStream(contentData); // input file stream to read chunks
         OutputStream outputFile = Files.newOutputStream(outputFilePath);
 
-        // chunk: first part is IV, then the actual content plus the 16 bytes GCM authentication tag
-        byte[] buffer = new byte[IVLEN + CHUNK_SIZE + 16];
+        // chunk: first part is IV, then the actual content plus the TAG_LEN bytes GCM authentication tag
+        byte[] buffer = new byte[IVLEN + CHUNK_SIZE + TAG_LEN];
         int bytesRead;
         int chunkIndex = 0;
         while ((bytesRead = is.read(buffer)) != -1) {
             // first part is the IV
             System.arraycopy(buffer, 0, iv, 0, IVLEN);
-            GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+            GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, iv);
             this.c.init(Cipher.DECRYPT_MODE, this.fileKey, spec, this.gen);
 
             // Set AAD for chunk decryption
