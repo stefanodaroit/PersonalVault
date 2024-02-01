@@ -1,17 +1,14 @@
 package app.gui;
 
-import static app.core.Constants.PSW_EXCEPTION;
 import static app.core.Constants.VAULT_NAME_RGX;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import app.core.KeyDerivator;
 import app.core.Vault;
 import app.core.Vault.InternalException;
 import app.core.KeyDerivator.InvalidPasswordException;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
@@ -19,13 +16,11 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
@@ -50,6 +45,7 @@ public class NewVaultStage extends Stage {
     
     this.setScene(setNameScene());
     this.setTitle("Add New Vault");
+    this.setResizable(false);
     this.show();
   }
 
@@ -159,48 +155,7 @@ public class NewVaultStage extends Stage {
    * Scene for the password selection
    */
   public Scene setPasswordScene() {
-    // Center box with text fields
-    final VBox centerBox = new VBox(10);
-
-    final Label pswLbl = new Label("Enter a password");
-    final PasswordField pswFld = new PasswordField();
-    
-    final Label pswLbl2 = new Label("Confirm the password");
-    final PasswordField pswFld2 = new PasswordField();
-
-    final Label[] statusPsw = {
-      new Label("Password policy:"),
-      new Label("At least 12 characters"),
-      new Label("At most 64 characters"),
-      new Label("At least a special character (?=!\"#$%&'()*+-.,/:;<>@^_)"),
-      new Label("At least one upper case character"),
-      new Label("At least one lower case character"),
-      new Label("At least one number")
-    };
-
-    for (int i = 1; i < statusPsw.length; i++) {
-      statusPsw[i].setPadding(new Insets(0, 0, 0, 20));
-      statusPsw[i].setTextFill(Color.RED);
-    }
-
-    pswFld.textProperty().addListener((observable, oldValue, newValue) -> {
-      String message = "";
-      try {
-        KeyDerivator.validatePassword(newValue);
-      } catch (InvalidPasswordException e) {
-        message = e.getMessage();
-      }
-      // Set the label colors to highlight policy miscompliances
-      for (int i = 1; i < statusPsw.length; i++) {
-        statusPsw[i].setTextFill(message.contains(PSW_EXCEPTION[i-1]) ? Color.RED : Color.GREEN);
-      }
-    });
-
-    centerBox.getChildren().addAll(pswLbl, pswFld, pswLbl2, pswFld2);
-    centerBox.getChildren().addAll(statusPsw);
-    centerBox.setAlignment(Pos.CENTER_LEFT);
-    centerBox.setPadding(new Insets(10));
-
+    final SetPswBox pswBox = new SetPswBox(false);
 
     // Bottom box with buttons
     final HBox bottomBox = new HBox(SPACING);
@@ -213,12 +168,12 @@ public class NewVaultStage extends Stage {
     final Button createBtn = new Button("Create Vault");
     createBtn.setOnAction(event -> {
       // Check if the passwords are equal
-      if (!pswFld.getText().equals(pswFld2.getText())) {
+      if (!pswBox.equalPsw()) {
         new Alert(AlertType.WARNING, "Passwords entered are different!", ButtonType.OK).show();
         return;
       }
 
-      this.vaultPsw = pswFld.getText();
+      this.vaultPsw = pswBox.getPsw();
       
       // Create vault and add to the listview
       try {
@@ -227,7 +182,7 @@ public class NewVaultStage extends Stage {
         PersonalVault.saveStoredVaults(this.listVault);
         this.close();
       } catch (InvalidPasswordException e) {
-        new Alert(AlertType.ERROR, "Invalid Password", ButtonType.OK).show();
+        new Alert(AlertType.WARNING, "Invalid Password", ButtonType.OK).show();
       } catch (IOException e) {
         new Alert(AlertType.ERROR, "Cannot create vault: a vault with same name already exists", ButtonType.OK).show();
       } catch (InternalException e) {
@@ -241,9 +196,10 @@ public class NewVaultStage extends Stage {
 
     // Main layout
     final BorderPane borderPane = new BorderPane();
-    borderPane.setCenter(centerBox);
+    borderPane.setCenter(pswBox);
     borderPane.setBottom(bottomBox);
 
     return new Scene(borderPane, WIDTH, HEIGHT);
   }
+
 }
