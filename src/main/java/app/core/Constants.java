@@ -17,4 +17,7 @@ public final class Constants {
   public static final int    MAX_TOKEN_SIZE = 500;
   public static final String ALG_HMAC_TOK= "HmacSHA512";
   public static final char   PERIOD = '.';
+
+  public static final String FILE_CHECKSUM_EXTENSION = ".mac";
+
 }
