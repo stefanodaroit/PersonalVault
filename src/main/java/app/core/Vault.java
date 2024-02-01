@@ -1,5 +1,6 @@
 package app.core;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -9,6 +10,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 import javax.crypto.Mac;
@@ -46,12 +48,12 @@ public class Vault {
       throw new NullPointerException("Null vault parameter");
     }
 
-    if (!name.matches("^[a-zA-Z0-9_ ]+$")) {
+    if (!(name == null || name.length() == 0 || name.matches(VAULT_NAME_RGX))) {
       throw new IllegalArgumentException("Invalid vault name");
     }
     
     this.vid = UUID.randomUUID();
-    this.name = name != null ? name : this.vid.toString();
+    this.name = (name != null && name.length() != 0) ? name : this.vid.toString();
     this.locked = false;
     
     try {
@@ -64,7 +66,7 @@ public class Vault {
       throw new InternalException();
     }
 
-    this.storagePath = Paths.get(storagePath, name);
+    this.storagePath = Paths.get(storagePath, this.name);
     Files.createDirectory(this.storagePath);
     
     // Create and save vault configuration
@@ -87,13 +89,13 @@ public class Vault {
       throw new NullPointerException("Invalid vault parameters");
     }
 
-    if (!name.matches("^[a-zA-Z0-9_]+$")) {
+    if (!(name == null || name.length() == 0 || name.matches(VAULT_NAME_RGX))) {
       throw new IllegalArgumentException("Invalid vault name");
     }
     
     this.vid = vid;
-    this.name = name != null ? name : this.vid.toString();
-    this.storagePath = Paths.get(storagePath, name);
+    this.name = (name != null && name.length() != 0) ? name : this.vid.toString();
+    this.storagePath = Paths.get(storagePath, this.name);
     
     try {
       // Read vault configuration and init key manager
@@ -412,12 +414,43 @@ public class Vault {
     return macResult;
   }
 
+  public static Vault importVault(File dir) throws InvalidConfigurationException, IOException {
+    // Check if a vault configuration file is present
+    List<Path> path = Files.find(Paths.get(dir.getAbsolutePath()), 1, (p, attr) -> p.getFileName().toString().endsWith(CONF_FILE_EXT)).toList();
+    
+    // If absent or multiple files throw error
+    if (path.size() != 1) {
+      throw new InvalidConfigurationException();
+    }   
+    
+    // Get UUID from vault
+    String vaultFilename = path.get(0).getFileName().toString();
+    vaultFilename = vaultFilename.substring(0, vaultFilename.length() - CONF_FILE_EXT.length());
+
+    // Create vault with obtained parameters and add to the list view
+    return new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
+  }
+
+  // Overriding equals() to compare two Vault objects
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj != null && obj instanceof Vault)) {
+      return false;
+    }
+
+    return this.getStoragePath().equals(((Vault) obj).getStoragePath());
+  }
+
   public UUID getVid() {
     return this.vid;
   }
 
   public String getName() {
     return this.name;
+  }
+
+  public void setName(String name){
+    this.name = name;
   }
 
   public String getStoragePath() {
@@ -430,6 +463,11 @@ public class Vault {
 
   public boolean isLocked() {
     return this.locked;
+  }
+
+  @Override
+  public String toString() {
+    return this.name + '\n' + this.storagePath.toString();
   }
 
   public static class InvalidConfigurationException extends Exception { 
