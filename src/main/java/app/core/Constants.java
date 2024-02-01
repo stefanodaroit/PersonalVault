@@ -32,4 +32,15 @@ public final class Constants {
   public static final String VAULT_NAME_RGX = "^[a-zA-Z0-9_ ]+$";
 
   public static final String[] PSW_EXCEPTION = { "(Short)", "(Long)", "(Special)", "(Upper)", "(Lower)", "(Digit)" };
+
+  // File
+  public static final int CHUNK_SIZE = 65536; // bytes 2^16
+  public static final int FILENAME_MAX_SIZE = 256; // bytes
+  public static final int IVLEN = 12; // bytes
+  public static final String KEY_GEN_ALGO = "AES";
+  public static final int KEY_SIZE_BITS = 256; // bits
+  public static final int KEY_SIZE = KEY_SIZE_BITS / 8; // bytes
+  public static final int TAG_LEN_BITS = 128; // bits
+  public static final int TAG_LEN = TAG_LEN_BITS / 8; // bytes
+
 }
