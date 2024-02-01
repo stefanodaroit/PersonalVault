@@ -13,6 +13,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+import static app.core.Constants.*;
+
 public class File {
 
     private final Path path; // "./dir/dir2/"
@@ -22,15 +24,6 @@ public class File {
     private SecretKey fileKey; // used to encrypt the content
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
-
-    private static final int IVLEN = 12; // bytes
-    private static final int CHUNK_SIZE = 65536; // bytes 2^16
-    private static final int KEY_SIZE_BITS = 256; // bits
-    private static final int KEY_SIZE = KEY_SIZE_BITS / 8; // bytes
-    private static final int FILENAME_MAX_SIZE = 256; // bytes
-    private static final String KEY_GEN_ALGO = "AES";
-    private static final int TAG_LEN_BITS = 128; // bits
-    private static final int TAG_LEN = TAG_LEN_BITS / 8; // bytes
 
     // TODO: Delete files and keep encrypted/decrypted only
 
