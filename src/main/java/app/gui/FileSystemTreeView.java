@@ -16,12 +16,19 @@ import javafx.scene.image.ImageView;
 
 public class FileSystemTreeView extends TreeView<String> {
 
-  private static final Image folderImage = new Image(ClassLoader.getSystemResourceAsStream("folder.png"), 20, 20, false, false);
-	private static final Image fileImage   = new Image(ClassLoader.getSystemResourceAsStream("file.png"),   20, 20, false, false);
+  private static Image folderImage = null;
+	private static Image fileImage = null;
 
   public FileSystemTreeView(Path path) {
     super();
-    
+
+    try {
+      folderImage = new Image(ClassLoader.getSystemResourceAsStream("folder.png"), 20, 20, false, false);
+      fileImage   = new Image(ClassLoader.getSystemResourceAsStream("file.png"),   20, 20, false, false);
+    } catch (RuntimeException e) {
+      System.err.println("Icons not found...");
+    }
+     
     TreeItem<String> root = new TreeItem<>(path.getFileName().toString());
     addDirectoryItems(root, path);
     
@@ -68,10 +75,10 @@ public class FileSystemTreeView extends TreeView<String> {
     
     // If the file is a directory recall the function with the directory as path
     if (!Files.isDirectory(file)) {
-      item.setGraphic(new ImageView(fileImage));
+      if (fileImage != null) item.setGraphic(new ImageView(fileImage));
     } else {
       addDirectoryItems(item, file);
-      item.setGraphic(new ImageView(folderImage));
+      if (folderImage != null) item.setGraphic(new ImageView(folderImage));
       item.setExpanded(true);
     }
 
@@ -97,11 +104,18 @@ public class FileSystemTreeView extends TreeView<String> {
   /**
    * Remove file or folder from the directory tree
    * 
-   * @param 
+   * @param item The item to remove
    */
   public void remove(TreeItem<String> item) {
     if (item == null) { return; }
     
     item.getParent().getChildren().remove(item); 
+  }
+
+  /**
+   * Remove all the directory content
+   */
+  public void clear() {    
+    this.getRoot().getChildren().clear();
   }
 }

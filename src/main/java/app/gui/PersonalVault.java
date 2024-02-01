@@ -7,6 +7,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
@@ -15,6 +16,9 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.Border;
@@ -24,6 +28,8 @@ import javafx.scene.layout.BorderStrokeStyle;
 import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -39,24 +45,35 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.StringJoiner;
 
 
 public class PersonalVault extends Application {
 
-  private final static double WIDTH = 1000, HEIGHT = 700, SPACING = 10;
-  protected final static String SRC = System.getProperty("user.home");
   private final static Path CONF = Paths.get(System.getProperty("user.home"), "personal-vault.conf");
-  private final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
+  protected final static String SRC = System.getProperty("user.home");
+  
+  private final static double WIDTH = 1000, HEIGHT = 800, SPACING = 10;
+  protected final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
   protected final static Background BACKGROUND = new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY));
   
-  private ListView<Vault> listVaultView = new ListView<Vault>();
+  private ListView<Vault> listVaultView;
+  private List<File> errorOnImport;
+
   private Stage primaryStage;
-  private BorderPane borderPane = new BorderPane();
+  private BorderPane mainPane;
+  private VBox emptyManageVault;
+
+  public PersonalVault() {
+    this.listVaultView = new ListView<>();
+    this.errorOnImport = new ArrayList<>();
+    this.mainPane = new BorderPane();
+  }
 
   @Override
-  public void start(Stage primaryStage){
+  public void start(Stage primaryStage) {
     this.primaryStage = primaryStage;
     
     // Top panel
@@ -69,10 +86,10 @@ public class PersonalVault extends Application {
     topPanel.getChildren().add(title);
   
     // Right panel
-    VBox rightPanel = new VBox();
-    rightPanel.setPrefSize(WIDTH * 0.6, HEIGHT);
-    rightPanel.setBorder(BORDER);
-    rightPanel.setBackground(BACKGROUND);
+    this.emptyManageVault = new VBox();
+    this.emptyManageVault.setPrefSize(WIDTH * 0.6, HEIGHT * 0.9);
+    this.emptyManageVault.setBorder(BORDER);
+    this.emptyManageVault.setBackground(BACKGROUND);
 
     // Bottom panel
     HBox bottomPanel = new HBox();
@@ -83,25 +100,84 @@ public class PersonalVault extends Application {
     bottomPanel.setBackground(BACKGROUND);
 
     // Push the different panels in the main layout
-    borderPane.setTop(topPanel);
-    borderPane.setLeft(getVaultListBox());
-    borderPane.setCenter(rightPanel);
-    borderPane.setBottom(bottomPanel);
-    Scene scene = new Scene(borderPane);
+    this.mainPane.setTop(topPanel);
+    this.mainPane.setLeft(getVaultListBox());
+    this.mainPane.setCenter(this.emptyManageVault);
+    this.mainPane.setBottom(bottomPanel);
 
     // Set up the stage
     this.primaryStage.setTitle("Personal Vault");
-    this.primaryStage.setScene(scene);
+    this.primaryStage.setScene(new Scene(this.mainPane));
+    this.primaryStage.setWidth(WIDTH);
+    this.primaryStage.setHeight(HEIGHT);
     this.primaryStage.setResizable(false);
-    this.primaryStage.show();
     this.primaryStage.setOnCloseRequest(e -> {
       Platform.exit();
     });
+    
+    this.primaryStage.show();
 
     // Place the window at the center of the screen
     Rectangle2D screen = Screen.getPrimary().getVisualBounds();
     this.primaryStage.setX((screen.getWidth()  - primaryStage.getWidth())  / 2);
     this.primaryStage.setY((screen.getHeight() - primaryStage.getHeight()) / 2);
+
+    // Show warning for imported vaults failed
+    if (!this.errorOnImport.isEmpty()) {
+      StringJoiner joiner = new StringJoiner("\n");
+      for (File dir : this.errorOnImport) {
+        joiner.add("\t" + dir.toString());
+      }
+      new Alert(AlertType.WARNING, "Cannot import the following vaults:\n" + joiner.toString() + "\nConfiguration file invalid or absent", ButtonType.OK).show();
+    }
+  }
+
+  public static class RemovableCell extends ListCell<Vault> {
+    
+    private static final double FONT_SIZE = 14;
+    
+    private HBox box;
+    private Label lbl;
+
+    public RemovableCell() {
+      super();
+      
+      box = new HBox();
+      lbl = new Label("");
+      Node btn = null;
+
+      try {
+        Image img = new Image(ClassLoader.getSystemResourceAsStream("remove.png"), 20, 20, false, false);
+        btn = new ImageView(img);
+        btn.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
+          Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to remove the vault?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
+          if (response.get() != ButtonType.OK) { return; }
+          
+          getListView().getItems().remove(getItem());
+          saveStoredVaults(getListView().getItems());
+        });
+      } catch(RuntimeException e) {
+        btn = new Button("X");
+      }
+      
+      Pane pane = new Pane();
+      box.getChildren().addAll(lbl, pane, btn);
+      box.setAlignment(Pos.CENTER_LEFT);
+      HBox.setHgrow(pane, Priority.ALWAYS);
+    }
+
+    @Override
+    protected void updateItem(Vault item, boolean empty) {
+      super.updateItem(item, empty);
+
+      if (item == null) {
+        setGraphic(null);
+      } else {
+        lbl.setFont(Font.font(FONT_SIZE));
+        lbl.setText(item.toString());
+        setGraphic(box);
+      }
+    }
   }
 
   /**
@@ -111,42 +187,34 @@ public class PersonalVault extends Application {
   public VBox getVaultListBox() {
     final double CELLSIZE = 80.0;
     
-    listVaultView = new ListView<Vault>();
-    listVaultView.setPrefWidth(WIDTH * 0.4);   
-    listVaultView.setPrefHeight(HEIGHT);   
-    listVaultView.setFixedCellSize(CELLSIZE); 
-    listVaultView.setCellFactory(cell -> {
-      return new ListCell<Vault>() {
-        @Override
-        protected void updateItem(Vault item, boolean empty) {
-          super.updateItem(item, empty);
-          if (item != null) {
-            setText(item.toString());
-            setFont(Font.font(14));
-          }
-        }
-      };
-    });
-    listVaultView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
-      borderPane.setCenter(new ManageVault(this.primaryStage, newValue));
+    this.listVaultView = new ListView<Vault>();
+    this.listVaultView.setPrefWidth(WIDTH * 0.4);   
+    this.listVaultView.setPrefHeight(HEIGHT);   
+    this.listVaultView.setFixedCellSize(CELLSIZE); 
+    this.listVaultView.setCellFactory(cell -> new RemovableCell());
+    this.listVaultView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+      if (newValue == null) {
+        this.mainPane.setCenter(this.emptyManageVault);
+        return;
+      }
+      this.mainPane.setCenter(new ManageVaultBox(this.primaryStage, this.listVaultView, newValue));
     });
     
 
-    // Add all vaults
+    // Add all already imported vaults
     List<String> paths = getStoredVaults();
-    for(String path: paths){
-      File f = new File(path);
+    for(String path : paths){
+      File dir = new File(path);
       try {
-        Vault v = Vault.importVault(f);
-        listVaultView.getItems().add(v);
-      } catch (InvalidConfigurationException e) {
-        new Alert(AlertType.ERROR, "Cannot import " + f + ": configuration file invalid or absent",   ButtonType.OK).show();
-      } catch (IOException e) {
-        new Alert(AlertType.ERROR, "Cannot import " + f + ": error while reading configuration file", ButtonType.OK).show();
+        Vault v = Vault.importVault(dir);
+        this.listVaultView.getItems().add(v);
+      } catch (IOException | InvalidConfigurationException e) {
+        errorOnImport.add(dir);
       }
+      saveStoredVaults(this.listVaultView.getItems());
     }
 
-    VBox leftPanel = new VBox(listVaultView);
+    VBox leftPanel = new VBox(this.listVaultView);
     leftPanel.setBorder(BORDER);
 
     return leftPanel;
@@ -158,7 +226,7 @@ public class PersonalVault extends Application {
   public Button newVaultBtn() {
     Button newBtn = new Button("New Vault");
     newBtn.setOnAction(event -> {
-      new NewVaultStage(listVaultView);
+      new NewVaultStage(this.listVaultView);
     });
 
     return newBtn;
@@ -184,11 +252,11 @@ public class PersonalVault extends Application {
       
       try {
         Vault v = Vault.importVault(dir);
-        if(listVaultView.getItems().contains(v)){
+        if(this.listVaultView.getItems().contains(v)){
           new Alert(AlertType.ERROR, "Cannot import " + dir + ": the folder has already been imported", ButtonType.OK).show();
         } else {
-          listVaultView.getItems().add(v);
-          saveStoredVaults(listVaultView.getItems());
+          this.listVaultView.getItems().add(v);
+          saveStoredVaults(this.listVaultView.getItems());
         }
       } catch (IOException e) {
         new Alert(AlertType.ERROR, "Cannot import " + dir + ": error while reading configuration file", ButtonType.OK).show();
@@ -204,6 +272,13 @@ public class PersonalVault extends Application {
    * Save vault paths into configuration file
    */
   public static void saveStoredVaults(List<Vault> vaultList) {
+    if (vaultList.isEmpty()) {
+      try { Files.delete(CONF); } 
+      catch (IOException e) {
+        System.err.println("Cannot delete configuration file");
+      }
+      return;
+    }    
     StringJoiner paths = new StringJoiner("\n");
     for(Vault v : vaultList) {
       paths.add(v.getStoragePath());
