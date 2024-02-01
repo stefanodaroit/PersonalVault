@@ -3,6 +3,7 @@ package app.gui;
 import app.core.Vault;
 import app.core.Vault.InvalidConfigurationException;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -45,16 +46,19 @@ import java.util.StringJoiner;
 public class PersonalVault extends Application {
 
   private final static double WIDTH = 1000, HEIGHT = 700, SPACING = 10;
-  private final static String SRC = System.getProperty("user.home");
+  protected final static String SRC = System.getProperty("user.home");
   private final static Path CONF = Paths.get(System.getProperty("user.home"), "personal-vault.conf");
   private final static Border BORDER = new Border(new BorderStroke(Color.valueOf("#9E9E9E"), BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT));
-  public  final static Background BACKGROUND = new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY));
+  protected final static Background BACKGROUND = new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY));
   
   private ListView<Vault> listVaultView = new ListView<Vault>();
+  private Stage primaryStage;
   private BorderPane borderPane = new BorderPane();
 
   @Override
   public void start(Stage primaryStage){
+    this.primaryStage = primaryStage;
+    
     // Top panel
     HBox topPanel = new HBox();
     topPanel.setPrefSize(WIDTH, HEIGHT * 0.05);
@@ -86,15 +90,18 @@ public class PersonalVault extends Application {
     Scene scene = new Scene(borderPane);
 
     // Set up the stage
-    primaryStage.setTitle("Personal Vault");
-    primaryStage.setScene(scene);
-    primaryStage.setResizable(false);
-    primaryStage.show();
+    this.primaryStage.setTitle("Personal Vault");
+    this.primaryStage.setScene(scene);
+    this.primaryStage.setResizable(false);
+    this.primaryStage.show();
+    this.primaryStage.setOnCloseRequest(e -> {
+      Platform.exit();
+    });
 
     // Place the window at the center of the screen
     Rectangle2D screen = Screen.getPrimary().getVisualBounds();
-    primaryStage.setX((screen.getWidth()  - primaryStage.getWidth())  / 2);
-    primaryStage.setY((screen.getHeight() - primaryStage.getHeight()) / 2);
+    this.primaryStage.setX((screen.getWidth()  - primaryStage.getWidth())  / 2);
+    this.primaryStage.setY((screen.getHeight() - primaryStage.getHeight()) / 2);
   }
 
   /**
@@ -121,7 +128,7 @@ public class PersonalVault extends Application {
       };
     });
     listVaultView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
-      borderPane.setCenter(new ManageVault(newValue));
+      borderPane.setCenter(new ManageVault(this.primaryStage, newValue));
     });
     
 
@@ -227,115 +234,4 @@ public class PersonalVault extends Application {
 
     return paths;
   }
-  
-
-  // private static void changePsw(final Vault v){
-  //   final Stage primaryStage = new Stage();
-  //   primaryStage.setTitle("Change Password");
-
-  //   Label oldPassword = new Label("Enter the current password for " + v.getName());
-  //   final PasswordField oldPasswordField = new PasswordField();
-
-  //   Label newPassword = new Label("Enter a new password");
-  //   final PasswordField newPasswordField = new PasswordField();
-
-  //   Label newPasswordRe = new Label("Confirm the new password");
-  //   final PasswordField newPasswordFieldRe = new PasswordField();
-
-  //   final Label[] statusPsw = {new Label("The password must contain at least 12 characters"),
-  //                                   new Label("The password must contain a maximum of 64 characters"),
-  //                                   new Label("The password must contain at least one special character"),
-  //                                   new Label("The password must contain at least one upper case character"),
-  //                                   new Label("The password must contain at least one number"),
-  //                                   new Label("The password must contain at least one lower case character")};
-
-  //   for(int i=0; i < statusPsw.length; i++){
-  //       statusPsw[i].setTextFill(Color.RED);
-  //   }
-
-  //   newPasswordField.textProperty().addListener(new ChangeListener<String>() {
-  //     @Override
-  //     public void changed(ObservableValue<? extends String> observable, String oldValue, String newValue) {
-  //         String message = "";
-  //         try {
-  //             KeyDerivator.validatePassword(newValue);
-  //         } catch (InvalidPasswordException e) {
-  //             message = e.getMessage();
-  //         }
-          
-  //         for(int i=0; i < statusPsw.length; i++){
-  //             if(!message.contains(statusPsw[i].getText()))
-  //                 statusPsw[i].setTextFill(Color.GREEN);
-  //             else
-  //                 statusPsw[i].setTextFill(Color.RED);
-  //         }
-  //     }
-  //   });
-
-  //   // Create a button for navigating back to the name input page
-  //   Button cancelPageButton = new Button("Cancel");
-  //   cancelPageButton.setOnAction(new EventHandler<ActionEvent>() {
-  //       @Override
-  //       public void handle(ActionEvent event) {
-  //           primaryStage.close();
-  //       }
-  //   });
-
-  //   // Create a button for navigating back to the name input page
-  //   Button changePswButton = new Button("Change");
-  //   changePswButton.setOnAction(new EventHandler<ActionEvent>() {
-  //       @Override
-  //       public void handle(ActionEvent event) {
-  //           if(newPasswordField.getText().equals(newPasswordFieldRe.getText())){
-  //             try{
-  //               v.changePsw(oldPasswordField.getText(), newPasswordField.getText());
-  //               Alert alert = new Alert(AlertType.CONFIRMATION, "The new password is setted", ButtonType.OK);
-  //               alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-  //               alert.show();
-  //               primaryStage.close();
-  //             } catch (InvalidPasswordException e){
-  //               Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
-  //               alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-  //               alert.show();
-  //             } catch (WrongPasswordException e) {
-  //               Alert alert = new Alert(AlertType.ERROR, e.getMessage(), ButtonType.OK);
-  //               alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-  //               alert.show();
-  //             } catch (InternalException e) {
-  //               e.getMessage();
-  //             } catch (IOException e) {
-  //               e.getMessage();
-  //             }
-              
-  //           } else {
-  //             Alert alert = new Alert(AlertType.ERROR, "The two passwords must be equal", ButtonType.OK);
-  //             alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
-  //             alert.show();
-  //           }
-            
-  //       }
-  //   });
-
-  //   // Create a layout 
-  //   VBox layout = new VBox(SPACING);
-  //   layout.getChildren().addAll(oldPassword, oldPasswordField, newPassword, newPasswordField);
-  //   layout.getChildren().addAll(newPasswordRe, newPasswordFieldRe);
-  //   layout.getChildren().addAll(statusPsw);
-  //   layout.setAlignment(Pos.CENTER);
-
-  //   HBox buttons = new HBox();
-  //   buttons.getChildren().addAll(cancelPageButton, changePswButton);
-
-  //   // Create the main layout
-  //   BorderPane borderPane = new BorderPane();
-  //   borderPane.setCenter(layout);
-  //   borderPane.setBottom(buttons);
-
-  //   // Set the new scene for the new stage
-  //   Scene newPageScene = new Scene(borderPane, 500, 400);
-  //   primaryStage.setScene(newPageScene);
-
-  //   // Show the new stage
-  //   primaryStage.show();
-  // }
 }

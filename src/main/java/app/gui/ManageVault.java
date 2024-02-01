@@ -1,11 +1,15 @@
 package app.gui;
 
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import app.core.Vault;
 import app.core.Vault.InternalException;
 import app.core.Vault.InvalidConfigurationException;
+import app.core.Vault.VaultLockedException;
 import app.core.Vault.WrongPasswordException;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -18,13 +22,15 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.PasswordField;
-import javafx.scene.control.TreeView;
+import javafx.scene.control.TreeItem;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 public class ManageVault extends VBox {
@@ -33,10 +39,23 @@ public class ManageVault extends VBox {
   
   private Vault vault;
 
-  public ManageVault(Vault v) {
+  private Stage primaryStage;
+  private FileSystemTreeView treeView;
+  private TreeItem<String> selectedItem;
+
+  public ManageVault(Stage stage, Vault vault) {
     super();
-    this.vault = v;
     
+    this.primaryStage = stage;
+    this.vault = vault;
+    this.selectedItem = null;
+
+    Path vaultPath = Paths.get(vault.getStoragePath());
+    this.treeView = new FileSystemTreeView(vaultPath);
+    this.treeView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+      this.selectedItem = (TreeItem<String>) newValue;
+    });
+
     if (this.vault.isLocked()) { 
       setLockedPane(); 
     } else { 
@@ -74,7 +93,7 @@ public class ManageVault extends VBox {
       final Button confirmBtn = new Button("Unlock");
       confirmBtn.setOnAction(e -> {
         try {
-          vault.unlock(pswFld.getText());
+          this.vault.unlock(pswFld.getText());
           unlockStage.close();
           this.getChildren().clear();
           setUnlockedPane();
@@ -97,6 +116,7 @@ public class ManageVault extends VBox {
       borderPaneNew.setBottom(bottomBox);
 
       unlockStage.setTitle("Unlock Vault");
+      unlockStage.setResizable(false);
       unlockStage.setScene(new Scene(borderPaneNew, WIDTH, HEIGHT));
       unlockStage.show();
     });
@@ -111,9 +131,20 @@ public class ManageVault extends VBox {
     
     final HBox topBox = new HBox();
     
-    
     final Button revealBtn = new Button("Reveal Content");
+    revealBtn.setOnAction(e -> {
+      try {
+        Desktop.getDesktop().browseFileDirectory(new File(this.vault.getStoragePath()));
+      } catch (RuntimeException exc) {
+        System.err.println("Unsupported feature");
+        new Alert(AlertType.WARNING, "Cannot reveal content: feature not supported on this platform", ButtonType.OK).show();
+      }
+    });
+
     final Button settingsBtn = new Button("Settings");
+    settingsBtn.setOnAction(e -> {
+      new SettingsStage(this.vault);
+    });
 
     final Region region = new Region();
     HBox.setHgrow(region, Priority.ALWAYS);
@@ -121,19 +152,69 @@ public class ManageVault extends VBox {
     topBox.setAlignment(Pos.CENTER);
     topBox.setPadding(new Insets(10));
 
-    Path vaultPath = Paths.get(vault.getStoragePath());
-    final TreeView<String> treeView = new DirectoryTreeItem(vaultPath);
-    VBox.setVgrow(treeView, Priority.ALWAYS);
-
-    final MenuButton addBtn = new MenuButton("Add");
-    addBtn.getItems().addAll(new MenuItem("Directory"), new MenuItem("File"));
+    final MenuButton addBtn  = new MenuButton("Add");
+    final MenuItem   addDir  = addDirectoryBtn();
+    final MenuItem   addFile = addFileBtn();
+   
+    addBtn.getItems().addAll(addDir, addFile);
     
     final Button removeBtn = new Button("Remove");
+    removeBtn.setOnAction(e -> {
+      this.treeView.remove(this.selectedItem);
+    });
+
     final HBox bottomBox = new HBox(SPACING, addBtn, removeBtn);
     bottomBox.setPadding(new Insets(10));
     bottomBox.setAlignment(Pos.CENTER);
 
-    this.getChildren().addAll(nameLbl, topBox, treeView, bottomBox);
+    VBox.setVgrow(this.treeView, Priority.ALWAYS);
+    this.getChildren().addAll(nameLbl, topBox, this.treeView, bottomBox);
+  }
+
+  private MenuItem addDirectoryBtn() {
+    final MenuItem addDir  = new MenuItem("Directory");
+    
+    DirectoryChooser dirChooser = new DirectoryChooser();
+    dirChooser.setTitle("Select Directory to add");
+    dirChooser.setInitialDirectory(new File(PersonalVault.SRC));
+    addDir.setOnAction(e -> {
+      File dir = dirChooser.showDialog(primaryStage);
+      if (dir == null) { return; }
+
+      try {
+        this.vault.addDirectory(dir.toString());
+        this.treeView.add(dir.toPath());
+      } catch (VaultLockedException exc) {
+        new Alert(AlertType.WARNING, "Cannot add directory: the vault is locked", ButtonType.OK).show();
+      } catch (IOException exc) {
+        new Alert(AlertType.ERROR, "Cannot add directory: error while copying", ButtonType.OK).show();
+      }
+    });
+
+    return addDir;
+  }
+
+  private MenuItem addFileBtn() {
+    final MenuItem addFile = new MenuItem("File");
+
+    FileChooser fileChooser = new FileChooser();
+    fileChooser.setTitle("Select File to add");
+    fileChooser.setInitialDirectory(new File(PersonalVault.SRC));
+    addFile.setOnAction(e -> {
+      File file = fileChooser.showOpenDialog(primaryStage);
+      if (file == null) { return; }
+
+      try {
+        this.vault.addFile(file.toString());
+        this.treeView.add(file.toPath());
+      } catch (VaultLockedException exc) {
+        new Alert(AlertType.WARNING, "Cannot add file: the vault is locked", ButtonType.OK).show();
+      } catch (IOException exc) {
+        new Alert(AlertType.ERROR, "Cannot add file: error while copying", ButtonType.OK).show();
+      }
+    });
+
+    return addFile;
   }
 
 }
