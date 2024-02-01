@@ -7,6 +7,7 @@ import app.core.Vault;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 public class TestMain {
@@ -30,11 +31,11 @@ public class TestMain {
       SecretKey encKey = keygen.generateKey();
 
       File fe = new File("./", "README.md");
-      String encFilename = fe.encrypt(encKey);
+      String encFilename = fe.encrypt(encKey, Path.of("."));
       System.out.println(encFilename);
 
       File fd = new File("./", encFilename);
-      String originalFilename = fd.decrypt(encKey);
+      String originalFilename = fd.decrypt(encKey, Path.of("./output")); // folder must exists beforehand
       System.out.println(originalFilename);
 
     } catch (Exception e) {
