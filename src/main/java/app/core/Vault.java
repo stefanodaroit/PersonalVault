@@ -116,11 +116,9 @@ public class Vault {
 
     this.files = new ArrayList<>();
 
-    
     // Add all files to the list of files
     for (Path file : Files.walk(this.storagePath).filter(Files::isRegularFile).toList()) {
       if(!file.getFileName().toString().contains(".vault") && !file.getFileName().toString().contains(FILE_CHECKSUM_EXTENSION)){
-        // TODO contains: if(!files.contains(file))
         files.add(file);
       }
     }
@@ -245,7 +243,6 @@ public class Vault {
       throw new InvalidConfigurationException();
     }
 
-    
     checkFilesIntegrity();
     
     this.locked = false;
@@ -253,6 +250,12 @@ public class Vault {
     // TODO add decryption part
   }
 
+  /**
+   * Method used to check the files integrity
+   * 
+   * @throws InvalidFilesException
+   * @throws InternalException
+   */
   private void checkFilesIntegrity() throws InvalidFilesException, InternalException{
 
     List<String> pathWithMac = readTreeChecksum();
@@ -260,59 +263,24 @@ public class Vault {
     for(String fileMac: pathWithMac){
       String path = fileMac.split(";")[0];
       String macString = fileMac.split(";")[1];
-      System.out.println(macString);
       byte[] mac = macString.getBytes(StandardCharsets. UTF_8);
       
-      // TODO sostituire il ciclo for con files.contains(path), quindi aggiungere un equals a File
       for(Path p: files){
-        if(p.toString().contains(path)){
+        Path newPath = p.subpath(storagePath.getNameCount(), p.getNameCount());
+        if(newPath.toString().equals(path)){
+
           // Recompute HMAC and path
-          Path newPath = p.subpath(storagePath.getNameCount(), p.getNameCount());
-          byte[] newMac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), path.getBytes(StandardCharsets. UTF_8));
-          System.out.print(newMac.toString());
-          System.out.println(Arrays.equals(mac, newMac));
+          byte[] newMac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), newPath.toString().getBytes(StandardCharsets. UTF_8));
+          byte[] mac2 = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), path.toString().getBytes(StandardCharsets. UTF_8));
           //!newPath.equals(path) || 
 
-          if(!MessageDigest.isEqual(mac, newMac)){
+          /*if(!MessageDigest.isEqual(mac, newMac)){
             System.out.println("Files integrity check failed");
             throw new InvalidFilesException();
-          }
+          }*/
         }
-        
-
-
       }
-
-      //System.out.println(files.toString());
-      /*if(files.toString().contains(path)){
-        //System.out.println(files.toString());
-      }
-      else{
-        System.out.println("Files integrity check failed");
-        throw new InvalidFilesException();
-      }*/
     }
-
-    // Loop over the source directory content
-    
-    /*Path srcDir = Paths.get(this.storagePath.toString());
-    int i = 0;
-    for (Path file : Files.walk(srcDir).filter(Files::isRegularFile).toList()) {
-      // Copy file considering the subdirectories
-      Path dest = file.subpath(srcDir.getNameCount(), file.getNameCount());
-      
-      if(!dest.getFileName().toString().contains(".vault") && !dest.getFileName().toString().contains(".mac") ){
-        String path = "./" + dest.toString();
-        
-        byte[] mac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), path.getBytes(StandardCharsets. UTF_8));
-
-        
-
-        System.out.println(filesMac.get(i));
-        System.out.println(Arrays.equals(lines.toString(), filesMac.get(i)));
-        i++;
-      } 
-    }*/
   }
 
   /**
