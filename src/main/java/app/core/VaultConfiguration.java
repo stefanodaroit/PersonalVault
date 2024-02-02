@@ -20,6 +20,15 @@ public class VaultConfiguration implements Serializable {
   private byte[] encKey;    // Encrypted symmetric key for files' header
   private byte[] authKey;   // Encrypted symmetric key for HMAC
   
+  /**
+   * Constructor used to initialize the vault configuration with the provided 
+   * vault ID, salt, encrypted file header key, and encrypted HMAC key
+   * 
+   * @param vid UUID  vault ID
+   * @param salt byte[]  salt used for key derivation
+   * @param encKey byte[]  encrypted symmetric key for files' header
+   * @param authKey byte[]  encrypted symmetric key for HMAC
+   */
   public VaultConfiguration(UUID vid, byte[] salt, byte[] encKey, byte[] authKey) {
     this.vid = vid.toString();
     this.salt = salt;
@@ -92,10 +101,18 @@ public class VaultConfiguration implements Serializable {
     "}";
   }
 
+  /**
+   * Method used to generate a path for storing the serialized configuration file 
+   * based on a given directory path and vault ID.
+   * 
+   * @param path Directory path
+   * @param vid  Vault ID
+   * 
+   * @return Path obj
+   */
   public static Path getPath(Path path, UUID vid) {
     return path.resolve(vid.toString() + CONF_FILE_EXT);
   }
-
   public static Path getPath(String path, UUID vid) {
     return Paths.get(path, vid.toString() + CONF_FILE_EXT);
   }
