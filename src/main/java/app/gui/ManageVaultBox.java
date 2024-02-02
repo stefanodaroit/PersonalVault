@@ -138,7 +138,17 @@ public class ManageVaultBox extends VBox {
     final Button revealBtn = new Button("Reveal Content");
     revealBtn.setOnAction(e -> {
       try {
-        Desktop.getDesktop().browseFileDirectory(new File(this.vault.getStoragePath()));
+        //Desktop.getDesktop().browseFileDirectory(new File(this.vault.getStoragePath()));
+        final String EXPLORER_EXE = "explorer.exe";
+
+        final String command = EXPLORER_EXE + " /SELECT,\"" + this.vault.getStoragePath() + "\\\"";
+        System.out.println(command);
+        try {
+          Runtime.getRuntime().exec(command);
+        } catch (IOException e1) {
+          System.err.println("Unsupported feature");
+          new Alert(AlertType.WARNING, "Cannot reveal content: feature not supported on this platform", ButtonType.OK).show();
+        }
       } catch (RuntimeException exc) {
         System.err.println("Unsupported feature");
         new Alert(AlertType.WARNING, "Cannot reveal content: feature not supported on this platform", ButtonType.OK).show();
