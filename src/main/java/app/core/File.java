@@ -15,7 +15,7 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class File {
+public class File extends Directory {
 
     private final Path folderPath; // "./dir/dir2/"
     private final String filename; // "file.txt"
@@ -34,6 +34,7 @@ public class File {
      * @throws NoSuchAlgorithmException
      */
     public File(String folderPath, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+        super(folderPath);
         if (folderPath == null || filename == null) {
             throw new IOException("path and filename cannot be null");
         }
