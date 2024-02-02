@@ -18,8 +18,8 @@ public final class Constants {
   public static final String ALG_HMAC_TOK = "HmacSHA512";
   public static final char   PERIOD = '.';
 
-  public static final String FILE_CHECKSUM_EXTENSION = ".mac";
-  public static final String CONF_FILE_EXT  = ".vault";
+  public static final String CHKSUM_FILE_EXT = ".mac";
+  public static final String CONF_FILE_EXT   = ".vault";
   public static final String VAULT_NAME_RGX = "^[a-zA-Z0-9_ ]+$";
 
   public static final String[] PSW_EXCEPTION = { "(Short)", "(Long)", "(Special)", "(Upper)", "(Lower)", "(Digit)" };

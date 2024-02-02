@@ -16,13 +16,14 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class Directory {
+public class VaultDirectory implements VaultElement {
 
-    private final Path folderPath; // "./dir/dir2/"
+    private final Path folderPath; // "./dir1/dir2/"
+    private final String folderName; // "dir"
     private final SecureRandom gen; // random bytes generator
     private final Cipher c;
     private byte[] headerIV; // Initialization Vector of the header
-    private String encName; // updated by encryptHeader, it is the encrypted directory name
+    public String encName; // updated by encryptHeader, it is the encrypted directory name
 
     /**
      * Instantiate a directory operation
@@ -32,9 +33,11 @@ public class Directory {
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
-    public Directory(String folderPath) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+    public VaultDirectory(Path folderPath) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         if (folderPath == null) throw new IOException("path cannot be null");
-        this.folderPath = Path.of(folderPath).normalize();
+        
+        this.folderPath = folderPath.getParent();
+        this.folderName = folderPath.getFileName().toString();
 
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
@@ -55,15 +58,16 @@ public class Directory {
      * @throws BadPaddingException
      * @throws IOException                        destination folder path cannot be null or other IO exceptions
      */
-    public String encrypt(SecretKey encKey, Path dstBaseFolderPath) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+    public String encrypt(Path srcPath, SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
-        if (dstBaseFolderPath == null) throw new IOException("destination folder path cannot be null");
+        if (srcPath == null) throw new IOException("destination folder path cannot be null");
 
-        byte[] encHeader = this.encryptHeader(encKey);
+        byte[] encHeader = this.encryptHeader(srcPath, encKey);
 
         String encDestinationStr = this.encName;
-        dstBaseFolderPath = dstBaseFolderPath.normalize(); // remove redundant elements
-        Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), encDestinationStr);
+        srcPath = srcPath.normalize(); // remove redundant elements
+        
+        Path dstFolderPath = Path.of(this.folderPath.toString(), encDestinationStr);
         Files.createDirectory(dstFolderPath);
 
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encDestinationStr + ".dir")); // encrypted file output
@@ -83,12 +87,12 @@ public class Directory {
      * @throws BadPaddingException
      * @throws InvalidAlgorithmParameterException
      */
-    private byte[] encryptHeader(SecretKey encKey) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+    private byte[] encryptHeader(Path src, SecretKey encKey) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         this.gen.nextBytes(this.headerIV);
         GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, headerIV);
         this.c.init(Cipher.ENCRYPT_MODE, encKey, spec, this.gen);
 
-        byte[] filenameBytes = this.folderPath.getFileName().toString().getBytes();
+        byte[] filenameBytes = src.getFileName().toString().getBytes();
         if (filenameBytes.length > FILENAME_MAX_SIZE) {
             throw new IllegalBlockSizeException("filename should be <= " + FILENAME_MAX_SIZE + " bytes, instead it is" + filenameBytes.length + " bytes long");
         }
@@ -164,7 +168,7 @@ public class Directory {
             throw new IllegalArgumentException("file size " + inputSize + "B is not long as expected " + headerFullSize + "B");
 
         byte[] encrypted = new byte[headerFullSize];
-        int _inputBytesRead = inputData.read(encrypted);
+        //int _inputBytesRead = inputData.read(encrypted);
 
         // first part of the full header data is the IV
         System.arraycopy(encrypted, 0, this.headerIV, 0, IVLEN);
@@ -188,5 +192,11 @@ public class Directory {
         return folderStr;
     }
 
+    public Path getFolderName() {
+        return Path.of(this.folderName);
+    }
 
+    public String getEncName() {
+        return this.encName;
+    }
 }

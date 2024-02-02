@@ -202,16 +202,17 @@ public class ManageVaultBox extends VBox {
     dirChooser.setTitle("Select Directory to add");
     dirChooser.setInitialDirectory(new File(PersonalVault.SRC));
     addDir.setOnAction(e -> {
-      File dir = dirChooser.showDialog(primaryStage);
-      if (dir == null) { return; }
-
+      File dirChosen = dirChooser.showDialog(primaryStage);
+      if (dirChosen == null) { return; }
+      
+      Path dir = dirChosen.toPath();
       try {
-        this.vault.addDirectory(dir.toString());
-        this.treeView.add(dir.toPath());
+        this.vault.addDirectory(dir);
+        this.treeView.add(dir);
       } catch (VaultLockedException exc) {
         new Alert(AlertType.WARNING, "Cannot add directory: the vault is locked", ButtonType.OK).show();
-      } catch (IOException exc) {
-        new Alert(AlertType.ERROR, "Cannot add directory: error while copying", ButtonType.OK).show();
+      } catch (IOException | InternalException exc) {
+        new Alert(AlertType.ERROR, "Cannot add directory: error while encrypting", ButtonType.OK).show();
       }
     });
 
@@ -225,16 +226,17 @@ public class ManageVaultBox extends VBox {
     fileChooser.setTitle("Select File to add");
     fileChooser.setInitialDirectory(new File(PersonalVault.SRC));
     addFile.setOnAction(e -> {
-      File file = fileChooser.showOpenDialog(primaryStage);
-      if (file == null) { return; }
+      File fileChosen = fileChooser.showOpenDialog(primaryStage);
+      if (fileChosen == null) { return; }
 
+      Path file = fileChosen.toPath();
       try {
-        this.vault.addFile(file.toString());
-        this.treeView.add(file.toPath());
+        this.vault.addFile(file);
+        this.treeView.add(file);
       } catch (VaultLockedException exc) {
         new Alert(AlertType.WARNING, "Cannot add file: the vault is locked", ButtonType.OK).show();
-      } catch (IOException exc) {
-        new Alert(AlertType.ERROR, "Cannot add file: error while copying", ButtonType.OK).show();
+      } catch (IOException | InternalException exc) {
+        new Alert(AlertType.ERROR, "Cannot add file: error while encrypting", ButtonType.OK).show();
       }
     });
 

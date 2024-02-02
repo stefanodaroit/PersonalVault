@@ -1,6 +1,7 @@
 package app.gui;
 
 import app.core.Vault;
+import app.core.Vault.InternalException;
 import app.core.Vault.InvalidConfigurationException;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -208,7 +209,7 @@ public class PersonalVault extends Application {
       try {
         Vault v = Vault.importVault(dir);
         this.listVaultView.getItems().add(v);
-      } catch (IOException | InvalidConfigurationException e) {
+      } catch (IOException | InvalidConfigurationException | InternalException e) {
         errorOnImport.add(dir);
       }
       saveStoredVaults(this.listVaultView.getItems());
@@ -262,6 +263,8 @@ public class PersonalVault extends Application {
         new Alert(AlertType.ERROR, "Cannot import " + dir + ": error while reading configuration file", ButtonType.OK).show();
       } catch (InvalidConfigurationException e) {
         new Alert(AlertType.ERROR, "Cannot import " + dir + ": configuration file invalid or absent",   ButtonType.OK).show();
+      } catch (InternalException e) {
+        new Alert(AlertType.ERROR, "Cannot import " + dir + ": internal error",   ButtonType.OK).show();
       }
     });
 
