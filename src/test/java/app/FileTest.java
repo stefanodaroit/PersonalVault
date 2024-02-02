@@ -2,10 +2,7 @@ package app;
 
 import app.core.File;
 import app.core.KeyManager;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.*;
 
 import javax.crypto.AEADBadTagException;
 import javax.crypto.KeyGenerator;
@@ -20,19 +17,18 @@ import java.util.Random;
 
 public class FileTest {
 
-    private final KeyManager km = new KeyManager();
     private final Random r = new Random();
     private final Path localPath = Path.of(".");
-    private static final Path dstTestPath = Path.of("./test");
+    private final Path dstTestPath = Path.of("./test");
 
     // https://junit.org/junit4/javadoc/latest/org/junit/BeforeClass.html
-    @BeforeClass
-    public static void createTestFolder() throws IOException {
+    @Before
+    public void createTestFolder() throws IOException {
         Files.createDirectory(dstTestPath);
     }
     // https://junit.org/junit4/javadoc/latest/org/junit/AfterClass.html
-    @AfterClass
-    public static void deleteTestFolder() throws IOException {
+    @After
+    public void deleteTestFolder() throws IOException {
         Files.delete(dstTestPath);
     }
 
@@ -122,7 +118,7 @@ public class FileTest {
     }
 
     @Test()
-    public void testEncryptFile() throws Exception {
+    public void testFileEncryptDecrypt() throws Exception {
         String filename = createRandomFile();
 
         KeyGenerator keygen = KeyGenerator.getInstance("AES");
@@ -204,7 +200,7 @@ public class FileTest {
         }
     }
 
-    //    @Test()
+    @Test()
     public void testEqualFilenames() throws Exception {
         String filename = "not-existing";
         String encFilename = "not-existing-enc";
@@ -222,7 +218,6 @@ public class FileTest {
             File fd = new File(localPath.toString(), encFilename);
             decFilename = fd.decrypt(encKey, dstTestPath);
         } finally {
-            // TODO: Implement deletion in File and remove from here
             Files.delete(Path.of(".", filename));
             Files.delete(Path.of(localPath.toString(), encFilename));
             Files.delete(Path.of(dstTestPath.toString(), decFilename));

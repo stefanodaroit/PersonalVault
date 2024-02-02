@@ -35,9 +35,8 @@ public class File extends Directory {
      */
     public File(String folderPath, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         super(folderPath);
-        if (folderPath == null || filename == null) {
-            throw new IOException("path and filename cannot be null");
-        }
+        if (filename == null) throw new IOException("filename cannot be null");
+
         this.folderPath = Path.of(folderPath).normalize();
         this.filename = Path.of(filename).normalize().getFileName().toString();
 
