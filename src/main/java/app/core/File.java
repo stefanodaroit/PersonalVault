@@ -24,6 +24,7 @@ public class File extends Directory {
     private SecretKey fileKey; // used to encrypt the content
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
+    private String encFilename; // updated by encryptHeader, it is the encrypted filename
 
     /**
      * Instantiate a file operation
@@ -48,6 +49,7 @@ public class File extends Directory {
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
+        this.encFilename = "";
     }
 
     /**
@@ -66,12 +68,10 @@ public class File extends Directory {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
-        StringBuilder encFilename = new StringBuilder();
-
-        byte[] encHeader = this.encryptHeader(encKey, encFilename);
+        byte[] encHeader = this.encryptHeader(encKey);
         byte[] encContent = this.encryptContent();
 
-        String encFilenameStr = Path.of(encFilename.toString()).normalize().getFileName().toString();
+        String encFilenameStr = Path.of(this.encFilename.toString()).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
         dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encFilenameStr)); // encrypted file output
 
@@ -86,7 +86,6 @@ public class File extends Directory {
     /**
      * function to encrypt the header (called in encrypt())
      * @param encKey key to use to encrypt the header
-     * @param encFilename instance of StringBuilder variable, at the end of this method it will contain the encrypted filename
      * @return encrypted bytes of full header
      * @throws NoSuchAlgorithmException
      * @throws InvalidKeyException
@@ -94,7 +93,7 @@ public class File extends Directory {
      * @throws BadPaddingException
      * @throws InvalidAlgorithmParameterException
      */
-    private byte[] encryptHeader(SecretKey encKey, StringBuilder encFilename) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+    private byte[] encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         KeyGenerator keygen = KeyGenerator.getInstance(KEY_GEN_ALGO);
         keygen.init(KEY_SIZE_BITS, this.gen); // bits
         this.fileKey = keygen.generateKey(); // used to encrypt content later
@@ -129,7 +128,7 @@ public class File extends Directory {
 
         String tempEncFilename = Base64.getUrlEncoder().encodeToString(encHeader);
         tempEncFilename = tempEncFilename.substring(0, Math.min(tempEncFilename.length(), 15));
-        encFilename.append(tempEncFilename); // param as reference
+        this.encFilename = tempEncFilename;
 
         return output;
     }
