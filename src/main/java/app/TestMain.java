@@ -9,11 +9,11 @@ import javax.crypto.SecretKey;
 import java.nio.file.Path;
 
 public class TestMain {
-  public static void main(String[] args) {
-    String psw = "Password1234!";
-    Vault v;
-    try {
-      // Create vault
+    public static void main(String[] args) {
+        String psw = "Password1234!";
+        Vault v;
+        try {
+            // Create vault
 //      v = new Vault("test", ".", psw);
 
 //      v.changePsw(psw, "eee");
@@ -24,9 +24,9 @@ public class TestMain {
 //      SecretKey s = new SecretKeySpec(ek, "AES");
 
 
-      KeyGenerator keygen = KeyGenerator.getInstance("AES");
-      keygen.init(256); // bits
-      SecretKey encKey = keygen.generateKey();
+            KeyGenerator keygen = KeyGenerator.getInstance("AES");
+            keygen.init(256); // bits
+            SecretKey encKey = keygen.generateKey();
 
 //      File fe = new File("./", "README.md");
 //      String encFilename = fe.encrypt(encKey, Path.of("."));
@@ -36,17 +36,17 @@ public class TestMain {
 //      String originalFilename = fd.decrypt(encKey, Path.of("./output")); // folder must exists beforehand
 //      System.out.println(originalFilename);
 
-      Path dstBaseFolderPath = Path.of("./output");
+            Path dstBaseFolderPath = Path.of("./output");
 
-      Directory doe = new Directory("src/main");
-      String encFilename = doe.encrypt(encKey, dstBaseFolderPath);
+            Directory doe = new Directory("src/main");
+            String encFilename = doe.encrypt(encKey, dstBaseFolderPath);
 
-      Directory dod = new Directory(Path.of(dstBaseFolderPath.toString(), encFilename).toString());
-      String originalFilename = dod.decrypt(encKey, Path.of("./output")); // destination base folder must exists beforehand
-      System.out.println(originalFilename);
+            Directory dod = new Directory(Path.of(dstBaseFolderPath.toString(), encFilename).toString());
+            String originalFilename = dod.decrypt(encKey, Path.of("./output")); // destination base folder must exists beforehand
+            System.out.println(originalFilename);
 
-    } catch (Exception e) {
-      e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
-  }
 }

@@ -26,6 +26,7 @@ public class FileTest {
     public void createTestFolder() throws IOException {
         Files.createDirectory(dstTestPath);
     }
+
     // https://junit.org/junit4/javadoc/latest/org/junit/AfterClass.html
     @After
     public void deleteTestFolder() throws IOException {

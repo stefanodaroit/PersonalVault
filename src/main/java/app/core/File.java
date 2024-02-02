@@ -28,9 +28,10 @@ public class File extends Directory {
 
     /**
      * Instantiate a file operation
+     *
      * @param folderPath base directory
-     * @param filename name of the file to open
-     * @throws IOException The path/filename is not a file or the file is not found
+     * @param filename   name of the file to open
+     * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
@@ -54,7 +55,8 @@ public class File extends Directory {
 
     /**
      * Public method to encrypt the file
-     * @param encKey key to use to encrypt the header
+     *
+     * @param encKey        key to use to encrypt the header
      * @param dstFolderPath destination folder path of the output file
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
@@ -85,6 +87,7 @@ public class File extends Directory {
 
     /**
      * function to encrypt the header (called in encrypt())
+     *
      * @param encKey key to use to encrypt the header
      * @return encrypted bytes of full header
      * @throws NoSuchAlgorithmException
@@ -136,6 +139,7 @@ public class File extends Directory {
 
     /**
      * function to encrypt the content (called in encrypt())
+     *
      * @return encrypted bytes of the content
      * @throws IOException
      * @throws InvalidAlgorithmParameterException
@@ -178,7 +182,8 @@ public class File extends Directory {
 
     /**
      * Public method to decrypt the file
-     * @param encKey key to use to decrypt the header
+     *
+     * @param encKey        key to use to decrypt the header
      * @param dstFolderPath destination folder path of the output file
      * @return the original plaintext filename
      * @throws InvalidAlgorithmParameterException
@@ -192,7 +197,7 @@ public class File extends Directory {
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
         Path inputFilePath = this.filenamePath;
-        int dstFileSize = (int)Files.size(inputFilePath); // MAX 2.14 GB !!!
+        int dstFileSize = (int) Files.size(inputFilePath); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
         String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
@@ -211,7 +216,8 @@ public class File extends Directory {
 
     /**
      * function to decrypt the header (called in decrypt())
-     * @param encKey key to use to encrypt the header
+     *
+     * @param encKey    key to use to encrypt the header
      * @param inputData stream of the encrypted file
      * @param inputSize size of the encrypted file
      * @return the original plaintext filename
@@ -255,9 +261,10 @@ public class File extends Directory {
 
     /**
      * function to decrypt the content (called in decrypt())
+     *
      * @param outputFilePath path of the plaintext file to be written
-     * @param fileData stream of the encrypted file
-     * @param inputSize size of the encrypted file
+     * @param fileData       stream of the encrypted file
+     * @param inputSize      size of the encrypted file
      * @throws IOException
      * @throws InvalidAlgorithmParameterException
      * @throws InvalidKeyException

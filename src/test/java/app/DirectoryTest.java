@@ -30,6 +30,7 @@ public class DirectoryTest {
 
         Files.createDirectory(dstTestPath);
     }
+
     // https://junit.org/junit4/javadoc/latest/org/junit/AfterClass.html
     @After
     public void deleteTestFolder() throws IOException {
@@ -142,7 +143,6 @@ public class DirectoryTest {
             Files.delete(Path.of(dstTestPath.toString(), encName));
         }
     }
-
 
 
 }

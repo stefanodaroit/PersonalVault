@@ -44,15 +44,16 @@ public class Directory {
 
     /**
      * Public method to encrypt the directory name
-     * @param encKey key used to encrypt the header
+     *
+     * @param encKey            key used to encrypt the header
      * @param dstBaseFolderPath destination folder path of output
      * @return the encrypted directory name
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
-     * @throws InvalidKeyException encryption key cannot be null
+     * @throws InvalidKeyException                encryption key cannot be null
      * @throws IllegalBlockSizeException
      * @throws BadPaddingException
-     * @throws IOException destination folder path cannot be null or other IO exceptions
+     * @throws IOException                        destination folder path cannot be null or other IO exceptions
      */
     public String encrypt(SecretKey encKey, Path dstBaseFolderPath) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
@@ -74,10 +75,11 @@ public class Directory {
 
     /**
      * Perform the encryption of the directory name and the building of the output file
+     *
      * @param encKey key used to encrypt the header
      * @return the output bytes to be written as a file
      * @throws InvalidKeyException
-     * @throws IllegalBlockSizeException directory name length is more than the allowed one
+     * @throws IllegalBlockSizeException          directory name length is more than the allowed one
      * @throws BadPaddingException
      * @throws InvalidAlgorithmParameterException
      */
@@ -114,14 +116,15 @@ public class Directory {
 
     /**
      * Public method to decrypt the file
-     * @param encKey key used to decrypt the header
+     *
+     * @param encKey            key used to decrypt the header
      * @param dstBaseFolderPath destination folder path of output
      * @return the decrypted directory name
      * @throws InvalidAlgorithmParameterException
      * @throws IllegalBlockSizeException
      * @throws BadPaddingException
-     * @throws InvalidKeyException encryption key cannot be null
-     * @throws IOException destination folder path cannot be null or other IO exceptions
+     * @throws InvalidKeyException                encryption key cannot be null
+     * @throws IOException                        destination folder path cannot be null or other IO exceptions
      */
     public String decrypt(SecretKey encKey, Path dstBaseFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
@@ -143,11 +146,12 @@ public class Directory {
 
     /**
      * Perform the encryption of the directory name and the building of the output file
-     * @param encKey key used to encrypt the header
+     *
+     * @param encKey    key used to encrypt the header
      * @param inputData stream of the encrypted file
      * @param inputSize size of the encrypted file
      * @return the original plaintext directory name
-     * @throws IllegalArgumentException the file is not a directory header file; the size is not as expected
+     * @throws IllegalArgumentException           the file is not a directory header file; the size is not as expected
      * @throws InvalidAlgorithmParameterException
      * @throws InvalidKeyException
      * @throws IllegalBlockSizeException
