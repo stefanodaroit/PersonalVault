@@ -15,7 +15,7 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class File {
+public class File extends Directory {
 
     private final Path folderPath; // "./dir/dir2/"
     private final String filename; // "file.txt"
@@ -24,19 +24,21 @@ public class File {
     private SecretKey fileKey; // used to encrypt the content
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
+    private String encFilename; // updated by encryptHeader, it is the encrypted filename
 
     /**
      * Instantiate a file operation
+     *
      * @param folderPath base directory
-     * @param filename name of the file to open
-     * @throws IOException The path/filename is not a file or the file is not found
+     * @param filename   name of the file to open
+     * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
     public File(String folderPath, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
-        if (folderPath == null || filename == null) {
-            throw new IOException("path and filename cannot be null");
-        }
+        super(folderPath);
+        if (filename == null) throw new IOException("filename cannot be null");
+
         this.folderPath = Path.of(folderPath).normalize();
         this.filename = Path.of(filename).normalize().getFileName().toString();
 
@@ -48,11 +50,13 @@ public class File {
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
+        this.encFilename = "";
     }
 
     /**
      * Public method to encrypt the file
-     * @param encKey key to use to encrypt the header
+     *
+     * @param encKey        key to use to encrypt the header
      * @param dstFolderPath destination folder path of the output file
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
@@ -66,12 +70,10 @@ public class File {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
-        StringBuilder encFilename = new StringBuilder();
-
-        byte[] encHeader = this.encryptHeader(encKey, encFilename);
+        byte[] encHeader = this.encryptHeader(encKey);
         byte[] encContent = this.encryptContent();
 
-        String encFilenameStr = Path.of(encFilename.toString()).normalize().getFileName().toString();
+        String encFilenameStr = Path.of(this.encFilename.toString()).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
         dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encFilenameStr)); // encrypted file output
 
@@ -85,8 +87,8 @@ public class File {
 
     /**
      * function to encrypt the header (called in encrypt())
+     *
      * @param encKey key to use to encrypt the header
-     * @param encFilename instance of StringBuilder variable, at the end of this method it will contain the encrypted filename
      * @return encrypted bytes of full header
      * @throws NoSuchAlgorithmException
      * @throws InvalidKeyException
@@ -94,7 +96,7 @@ public class File {
      * @throws BadPaddingException
      * @throws InvalidAlgorithmParameterException
      */
-    private byte[] encryptHeader(SecretKey encKey, StringBuilder encFilename) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+    private byte[] encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         KeyGenerator keygen = KeyGenerator.getInstance(KEY_GEN_ALGO);
         keygen.init(KEY_SIZE_BITS, this.gen); // bits
         this.fileKey = keygen.generateKey(); // used to encrypt content later
@@ -129,7 +131,7 @@ public class File {
 
         String tempEncFilename = Base64.getUrlEncoder().encodeToString(encHeader);
         tempEncFilename = tempEncFilename.substring(0, Math.min(tempEncFilename.length(), 15));
-        encFilename.append(tempEncFilename); // param as reference
+        this.encFilename = tempEncFilename;
 
         return output;
     }
@@ -137,6 +139,7 @@ public class File {
 
     /**
      * function to encrypt the content (called in encrypt())
+     *
      * @return encrypted bytes of the content
      * @throws IOException
      * @throws InvalidAlgorithmParameterException
@@ -179,7 +182,8 @@ public class File {
 
     /**
      * Public method to decrypt the file
-     * @param encKey key to use to decrypt the header
+     *
+     * @param encKey        key to use to decrypt the header
      * @param dstFolderPath destination folder path of the output file
      * @return the original plaintext filename
      * @throws InvalidAlgorithmParameterException
@@ -193,7 +197,7 @@ public class File {
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
         Path inputFilePath = this.filenamePath;
-        int dstFileSize = (int)Files.size(inputFilePath); // MAX 2.14 GB !!!
+        int dstFileSize = (int) Files.size(inputFilePath); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
         String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
@@ -212,7 +216,8 @@ public class File {
 
     /**
      * function to decrypt the header (called in decrypt())
-     * @param encKey key to use to encrypt the header
+     *
+     * @param encKey    key to use to encrypt the header
      * @param inputData stream of the encrypted file
      * @param inputSize size of the encrypted file
      * @return the original plaintext filename
@@ -256,9 +261,10 @@ public class File {
 
     /**
      * function to decrypt the content (called in decrypt())
+     *
      * @param outputFilePath path of the plaintext file to be written
-     * @param fileData stream of the encrypted file
-     * @param inputSize size of the encrypted file
+     * @param fileData       stream of the encrypted file
+     * @param inputSize      size of the encrypted file
      * @throws IOException
      * @throws InvalidAlgorithmParameterException
      * @throws InvalidKeyException
