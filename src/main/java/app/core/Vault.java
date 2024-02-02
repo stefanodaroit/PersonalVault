@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -113,7 +114,16 @@ public class Vault {
     this.storagePath = Paths.get(storagePath, name);
     this.treeChecksumFile = Paths.get(this.storagePath.toString() + "/" + this.vid + FILE_CHECKSUM_EXTENSION);
 
-    //TODO add all files to files
+    this.files = new ArrayList<>();
+
+    
+    // Add all files to the list of files
+    for (Path file : Files.walk(this.storagePath).filter(Files::isRegularFile).toList()) {
+      if(!file.getFileName().toString().contains(".vault") && !file.getFileName().toString().contains(FILE_CHECKSUM_EXTENSION)){
+        // TODO contains: if(!files.contains(file))
+        files.add(file);
+      }
+    }
     
     try {
       // Read vault configuration and init key manager
@@ -188,12 +198,10 @@ public class Vault {
     Path dst = this.storagePath.resolve(dstPath == null ? srcPath.getFileName() : dstPath);
     Files.copy(srcPath, dst, StandardCopyOption.COPY_ATTRIBUTES);
 
-    files.add(dst);
-
-    // Add the file to the tree checksum
+    // Add the file to the tree checksum and to the list of files
     if(!isDir(dst)){
       files.add(dst);
-      writeTreeChecksum(dst);
+      createTreeChecksum(dst);
     }
 
     // TODO add encryption part
@@ -208,8 +216,9 @@ public class Vault {
    * @throws WrongPasswordException
    * @throws InternalException
    * @throws IOException 
+   * @throws InvalidFilesException 
    */
-  public void unlock(String psw) throws InvalidConfigurationException, WrongPasswordException, InternalException, IOException {
+  public void unlock(String psw) throws InvalidConfigurationException, WrongPasswordException, InternalException, IOException, InvalidFilesException {
     try {
       // Unwrap secret keys through input password
       this.km.unwrapSecretKeys(psw);
@@ -227,7 +236,7 @@ public class Vault {
       byte[] mac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), encodedConf);
       
       // Check the two MACs; if not equal the configuration have been tampered
-      if (!Arrays.equals(this.confMac, mac)) {
+      if (!MessageDigest.isEqual(this.confMac, mac)) {
         System.out.println("Configuration integrity check failed");
         throw new InvalidConfigurationException();
       }
@@ -236,20 +245,52 @@ public class Vault {
       throw new InvalidConfigurationException();
     }
 
-    //checkFilesIntegrity();
-
+    
+    checkFilesIntegrity();
+    
     this.locked = false;
+
     // TODO add decryption part
   }
 
-  private void checkFilesIntegrity(){
+  private void checkFilesIntegrity() throws InvalidFilesException, InternalException{
 
-    List<String> filesMac = readTreeChecksum();
+    List<String> pathWithMac = readTreeChecksum();
     
-    for(String fileMac: filesMac){
+    for(String fileMac: pathWithMac){
       String path = fileMac.split(";")[0];
-      String mac = fileMac.split(";")[1];
+      String macString = fileMac.split(";")[1];
+      System.out.println(macString);
+      byte[] mac = macString.getBytes(StandardCharsets. UTF_8);
       
+      // TODO sostituire il ciclo for con files.contains(path), quindi aggiungere un equals a File
+      for(Path p: files){
+        if(p.toString().contains(path)){
+          // Recompute HMAC and path
+          Path newPath = p.subpath(storagePath.getNameCount(), p.getNameCount());
+          byte[] newMac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), path.getBytes(StandardCharsets. UTF_8));
+          System.out.print(newMac.toString());
+          System.out.println(Arrays.equals(mac, newMac));
+          //!newPath.equals(path) || 
+
+          if(!MessageDigest.isEqual(mac, newMac)){
+            System.out.println("Files integrity check failed");
+            throw new InvalidFilesException();
+          }
+        }
+        
+
+
+      }
+
+      //System.out.println(files.toString());
+      /*if(files.toString().contains(path)){
+        //System.out.println(files.toString());
+      }
+      else{
+        System.out.println("Files integrity check failed");
+        throw new InvalidFilesException();
+      }*/
     }
 
     // Loop over the source directory content
@@ -443,7 +484,7 @@ public class Vault {
 
     // Decode header and check if the algorithm is correct (only HMACSHA512 at the moment)
     byte[] header  = Base64.getDecoder().decode(tok[0]);
-    if (!Arrays.equals(header, ALG_HMAC_TOK.getBytes())) {
+    if (!MessageDigest.isEqual(header, ALG_HMAC_TOK.getBytes())) {
       throw new InvalidConfigurationException();
     }
 
@@ -484,53 +525,75 @@ public class Vault {
     else return Files.isDirectory(path);
   }
 
-  public void writeTreeChecksum(Path file) throws IOException, VaultLockedException, InternalException{
-   
-    StringJoiner fileWithMac = new StringJoiner(";", "", "\n");
-
+  /**
+   * Add the file in the tree checksum: path file;HMAC
+   * 
+   * @param file Path  path of the file to add
+   * @throws IOException
+   * @throws VaultLockedException
+   * @throws InternalException
+   */
+  private void createTreeChecksum(Path file) throws IOException, VaultLockedException, InternalException{
+  
+    // String Joiner for the line
+    StringJoiner pathWithMac = new StringJoiner(";", "", "\n");
+    // Create the dest path without the name of the vault
     Path dest = file.subpath(storagePath.getNameCount(), file.getNameCount());
-    
-    System.out.println(dest);
-    
+    // Create the MAC of the dest path with the master key
     byte[] mac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), dest.toString().getBytes(StandardCharsets. UTF_8));
 
-    fileWithMac.add(dest.toString());
-    fileWithMac.add(mac.toString());
+    // Add to the StringJoiner the dest path and MAC
+    pathWithMac.add(dest.toString());
+    pathWithMac.add(mac.toString());
 
-    System.out.println(fileWithMac);
-
-    writeTreeChecksumToFile(fileWithMac);
+    // Write the StringJoiner to the tree checksum file
+    writeTreeChecksumToFile(pathWithMac);
     
   }
 
+  /**
+   * Method to add a StringJoiner in a file
+   * 
+   * @param sj StringJoiner  String to add to the file
+   */
   private void writeTreeChecksumToFile(StringJoiner sj){
+
+    // Open the file in append mode
     try(FileWriter fw = new FileWriter(treeChecksumFile.toString(), true);
         BufferedWriter bw = new BufferedWriter(fw);
         PrintWriter out = new PrintWriter(bw)){
+          
+          // Add the StringJoiner to the file
           out.print(sj.toString());
     } catch (IOException e) {
       System.err.println("Cannot write tree checksum file");
     }
   }
 
+  /**
+   * Method to read the tree checksum file
+   * 
+   * @return List<String>  list of path;HMAC
+   */
   public List<String> readTreeChecksum(){
-    List<String> paths = new ArrayList<>();
+    // List of path;HMAC
+    List<String> pathWithMac = new ArrayList<>();
 
-    /*try {
+    try {
+      // Read all the lines of the file
       Scanner scan = new Scanner(treeChecksumFile.toFile());
       while (scan.hasNextLine()) {
-        paths.add(scan.nextLine());
+        pathWithMac.add(scan.nextLine());
       }
+      // Close the scan
       scan.close();
     } catch (FileNotFoundException e) {
       System.out.println("Tree checksum file absent");
-    }*/
+    }
 
-    return paths;
-    
+    return pathWithMac;
   }
   
-
   public UUID getVid() {
     return this.vid;
   }

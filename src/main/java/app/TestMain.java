@@ -36,7 +36,7 @@ public class TestMain {
       v = new Vault(v.getVid(), NAME, PATH);
       v.unlock(PSW);
       v.addDirectory(DIR + '/' + SUBDIR);
-
+      v.unlock(PSW);
       //v.changePsw(psw, "eee");
       //v.unlock(psw);
       //deleteConfig(v);
