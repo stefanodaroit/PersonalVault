@@ -12,6 +12,12 @@ import app.core.VaultConfiguration;
 
 import app.core.Vault;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+
 public class TestMain {
   private static final String PSW = "SecretP@ssword1234";
   private static final String PATH = ".";

@@ -27,21 +27,16 @@ public class KeyDerivator {
 
   private Random gen;                                                   // Secure random bytes generator 
 
-  List<String> weakPasswords = new ArrayList<String>();                 // List of weak passwords
-  Path path = Paths.get("src/main/resources/WeakPasswords.txt");        // Path for the file with weak passwords 
+  // Read the weakPasswords.txt file and inserts the weak passwords into the list
+  private static List<String> weakPasswords = readFile(Paths.get("src/main/resources/WeakPasswords.txt"));
 
   /**
    * KeyDerivator class constructor for the first initialization of the salt:
    * set the salt randomly and insert the weak passwords into the list
    */
-  public KeyDerivator(){ 
-
-    this.gen = new SecureRandom();
-    // Set the salt randomly
+  public KeyDerivator() { 
+    this.gen  = new SecureRandom();
     this.salt = getNextSalt();
-
-    // Read the weakPasswords.txt file and inserts the weak passwords into the list
-    readFile();
   }
 
   /**
@@ -63,10 +58,7 @@ public class KeyDerivator {
     }
 
     this.salt = salt;
-
-    // Read the weakPasswords.txt file and inserts the weak passwords into the list
-    readFile();
-   }
+  }
 
   /**
    * Method for initializing the new password entered, verifying its security
@@ -198,13 +190,11 @@ public class KeyDerivator {
    * @param masterPassword String  user-input password
    * @throws InvalidPasswordException if the password is null
    */
-  public void validatePassword(String password) throws InvalidPasswordException {
-    
-    // If the password is null, generate an IllegalArgumentException
-    if(password == null){
+  public static void validatePassword(String password) throws InvalidPasswordException {
+    if (password == null) {
       throw new NullPointerException("The password cannot be null");
     }
-    
+
     // Generate regex patter for rules
     Pattern lowerCase = Pattern.compile("[a-z]");
     Pattern upperCase = Pattern.compile("[A-Z]");
@@ -217,39 +207,45 @@ public class KeyDerivator {
     Matcher hasDigit = digit.matcher(password);
     Matcher hasSpecial = special.matcher(password);
 
-    // If the password is too short, generate an InvalidPasswordException
+    String message = null;
+
+    // If the password is too short
     if (password.length() < MIN_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("The password must contain at least " + MIN_PASSWORD_LENGTH + " characters");    
+      message = PSW_EXCEPTION[0] + " The password must contain at least " + MIN_PASSWORD_LENGTH + " characters \n";    
+    } 
+
+    // If the password is too long
+    if (password.length() > MAX_PASSWORD_LENGTH) {
+      message += PSW_EXCEPTION[1] + " The password must contain a maximum of " + MAX_PASSWORD_LENGTH + " characters \n";   
+    } 
+
+    // If the password has not a special character
+    if (!hasSpecial.find()) {
+      message += PSW_EXCEPTION[2] + " The password must contain at least one special character \n";  
     }
 
-    // If the password is too long, generate an InvalidPasswordException
-    else if (password.length() > MAX_PASSWORD_LENGTH) {
-      throw new InvalidPasswordException("The password must contain a maximum of " + MAX_PASSWORD_LENGTH + " characters");   
+    // If the password has not an upper case character
+    if (!hasUpperCase.find()) {
+      message += PSW_EXCEPTION[3] + " The password must contain at least one upper case character \n";
+    } 
+
+    // If the password has not a lower case character
+    if (!hasLowerCase.find()) {
+      message += PSW_EXCEPTION[4] + " The password must contain at least one lower case character\n";  
     }
 
-    // If the password has not a special character, generate an InvalidPasswordException
-    else if (!hasSpecial.find()) {
-      throw new InvalidPasswordException("The password must contain at least one special character");  
+    // If the password has not a number
+    if (!hasDigit.find()) {
+      message += PSW_EXCEPTION[5] + " The password must contain at least one number\n";  
+    } 
+    
+    // If the password is in the list of weak passwords
+    if (message == null && weakPasswords.contains(password)) {
+      message += "The password must not be in the list of weak passwords";  
     }
 
-    // If the password has not an upper case character, generate an InvalidPasswordException
-    else if (!hasUpperCase.find()) {
-      throw new InvalidPasswordException("The password must contain at least one upper case character");
-    }
-
-    // If the password has not a number, generate an InvalidPasswordException
-    else if (!hasDigit.find()) {
-      throw new InvalidPasswordException("The password must contain at least one number");  
-    }
-
-    // If the password has not a lower case character, generate an InvalidPasswordException
-    else if (!hasLowerCase.find()) {
-      throw new InvalidPasswordException("The password must contain at least one lower case character");  
-    }
-
-    // If the password is in the list of weak passwords, generate an InvalidPasswordException
-    else if(weakPasswords.contains(password) ? true : false){
-      throw new InvalidPasswordException("The password must not be in the list of weak passwords");  
+    if (message != null) {
+      throw new InvalidPasswordException(message);
     }
   }
 
@@ -257,7 +253,9 @@ public class KeyDerivator {
    * Method to read the WeakPasswords.txt file and store 
    * the file's passwords in the weak passwords list
    */
-  private void readFile() {
+  private static List<String> readFile(Path path) {
+    List<String> weakPasswords = new ArrayList<>();
+
     // Convert the path in an absolute path
     path = path.toAbsolutePath();
     // Convert type path in string
@@ -281,7 +279,9 @@ public class KeyDerivator {
       
     } catch (IOException ex) {
       System.out.println(ex.getMessage());
-    }    
+    }  
+    
+    return weakPasswords;
   }
 
   public class InvalidSaltException extends Exception { 
@@ -290,11 +290,11 @@ public class KeyDerivator {
     } 
   }
 
-  public class InvalidPasswordException extends Exception { 
+  public static class InvalidPasswordException extends Exception { 
     public InvalidPasswordException(final String message) { 
       super(message); 
     }
-  }  
+  } 
 }
 
 

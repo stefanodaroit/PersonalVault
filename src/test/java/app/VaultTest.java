@@ -180,28 +180,34 @@ public class VaultTest extends TestCase{
   }
 
   @Test
-  public void testInvalidPath() throws Exception {
-    v = new Vault(NAME, PATH, PSW);
-    
+  public void testInvalidParams() throws Exception {
     try {
       new Vault(NAME, INVPATH, PSW);
       Assert.fail("IOException not thrown");
     } catch (IOException e) {}
 
     try {
+      v = new Vault(NAME, PATH, PSW);
       new Vault(v.getVid(), NAME, INVPATH);
       Assert.fail("IOException not thrown");
-    } catch (IOException e) {}
+    } catch (IOException e) {
+      deleteConfig(v);
+    }
 
-    deleteConfig(v);
-  }
-
-  @Test
-  public void testInvalidPsw() throws Exception {    
     try {
       new Vault(NAME, PATH, "password");
       Assert.fail("InvalidPasswordException not thrown");
     } catch (InvalidPasswordException e) {}
+
+    try {
+      new Vault("../Vault", PATH, "password");
+      Assert.fail("IllegalArgumentException not thrown");
+    } catch (IllegalArgumentException e) {}
+
+    String name = null;
+    deleteConfig(new Vault(name, PATH, PSW));
+
+    deleteConfig(new Vault("", PATH, PSW));
   }
 
   @Test
