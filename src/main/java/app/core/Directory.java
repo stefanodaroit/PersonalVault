@@ -22,12 +22,13 @@ public class Directory {
     private final SecureRandom gen; // random bytes generator
     private final Cipher c;
     private byte[] headerIV; // Initialization Vector of the header
+    private String encName; // updated by encryptHeader, it is the encrypted directory name
 
     /**
-     * Instantiate a file operation
+     * Instantiate a directory operation
      *
      * @param folderPath base directory
-     * @throws IOException              The path/filename is not a file or the file is not found
+     * @throws IOException              The path is not defined
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
@@ -38,17 +39,28 @@ public class Directory {
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
+        this.encName = "";
     }
 
+    /**
+     * Public method to encrypt the directory name
+     * @param encKey key used to encrypt the header
+     * @param dstBaseFolderPath destination folder path of output
+     * @return the encrypted directory name
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidAlgorithmParameterException
+     * @throws InvalidKeyException encryption key cannot be null
+     * @throws IllegalBlockSizeException
+     * @throws BadPaddingException
+     * @throws IOException destination folder path cannot be null or other IO exceptions
+     */
     public String encrypt(SecretKey encKey, Path dstBaseFolderPath) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstBaseFolderPath == null) throw new IOException("destination folder path cannot be null");
 
-        StringBuilder encFilename = new StringBuilder();
+        byte[] encHeader = this.encryptHeader(encKey);
 
-        byte[] encHeader = this.encryptHeader(encKey, encFilename);
-
-        String encDestinationStr = encFilename.toString();
+        String encDestinationStr = this.encName;
         dstBaseFolderPath = dstBaseFolderPath.normalize(); // remove redundant elements
         Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), encDestinationStr);
         Files.createDirectory(dstFolderPath);
@@ -60,7 +72,16 @@ public class Directory {
         return encDestinationStr;
     }
 
-    private byte[] encryptHeader(SecretKey encKey, StringBuilder encFilename) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+    /**
+     * Perform the encryption of the directory name and the building of the output file
+     * @param encKey key used to encrypt the header
+     * @return the output bytes to be written as a file
+     * @throws InvalidKeyException
+     * @throws IllegalBlockSizeException directory name length is more than the allowed one
+     * @throws BadPaddingException
+     * @throws InvalidAlgorithmParameterException
+     */
+    private byte[] encryptHeader(SecretKey encKey) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         this.gen.nextBytes(this.headerIV);
         GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, headerIV);
         this.c.init(Cipher.ENCRYPT_MODE, encKey, spec, this.gen);
@@ -83,14 +104,25 @@ public class Directory {
         System.arraycopy(headerIV, 0, output, 0, IVLEN);
         System.arraycopy(encHeader, 0, output, IVLEN, encHeader.length);
 
-        String tempEncFilename = Base64.getUrlEncoder().encodeToString(encHeader);
-        tempEncFilename = tempEncFilename.substring(0, Math.min(tempEncFilename.length(), 15));
-        encFilename.append(tempEncFilename); // param as reference
+        String tempEncName = Base64.getUrlEncoder().encodeToString(encHeader);
+        tempEncName = tempEncName.substring(0, Math.min(tempEncName.length(), 15));
+        this.encName = tempEncName;
 
         return output;
     }
 
 
+    /**
+     * Public method to decrypt the file
+     * @param encKey key used to decrypt the header
+     * @param dstBaseFolderPath destination folder path of output
+     * @return the decrypted directory name
+     * @throws InvalidAlgorithmParameterException
+     * @throws IllegalBlockSizeException
+     * @throws BadPaddingException
+     * @throws InvalidKeyException encryption key cannot be null
+     * @throws IOException destination folder path cannot be null or other IO exceptions
+     */
     public String decrypt(SecretKey encKey, Path dstBaseFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstBaseFolderPath == null) throw new IOException("destination folder path cannot be null");
@@ -100,16 +132,29 @@ public class Directory {
 
         int dstFileSize = (int) Files.size(directoryFile); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(directoryFile); // input file stream
-        String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
+        String originalName = this.decryptHeader(encKey, inputData, dstFileSize);
 
         dstBaseFolderPath = dstBaseFolderPath.normalize(); // remove redundant elements
-        Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), originalFilename).normalize();
+        Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), originalName).normalize();
         Files.createDirectory(dstFolderPath);
 
         return dstFolderPath.getFileName().toString();
     }
 
-    private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+    /**
+     * Perform the encryption of the directory name and the building of the output file
+     * @param encKey key used to encrypt the header
+     * @param inputData stream of the encrypted file
+     * @param inputSize size of the encrypted file
+     * @return the original plaintext directory name
+     * @throws IllegalArgumentException the file is not a directory header file; the size is not as expected
+     * @throws InvalidAlgorithmParameterException
+     * @throws InvalidKeyException
+     * @throws IllegalBlockSizeException
+     * @throws BadPaddingException
+     * @throws IOException
+     */
+    private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws IllegalArgumentException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         int headerFullSize = IVLEN + 1 + FILENAME_MAX_SIZE + TAG_LEN; // last TAG_LEN bytes are GCM authentication tag
         if (inputSize != headerFullSize)
             throw new IllegalArgumentException("file size " + inputSize + "B is not long as expected " + headerFullSize + "B");
@@ -128,10 +173,10 @@ public class Directory {
 
         byte[] headerContent = this.c.doFinal(ciphertext);
 
-        // first part is the plain filename length expressed in a byte
+        // first part is the plain folder name length expressed in a byte
         int folderNameSize = headerContent[0];
 
-        // second part is the filename value
+        // second part is the folder name value
         byte[] folderName = new byte[folderNameSize];
         System.arraycopy(headerContent, 1, folderName, 0, folderNameSize);
 
