@@ -148,6 +148,16 @@ public class VaultDirectory implements VaultElement{
 
         dstBaseFolderPath = dstBaseFolderPath.normalize(); // remove redundant elements
         Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), this.folderName).normalize();
+
+        // if a directory with the same name already exists, we append an index to the new one to not overwrite the previous one
+        if (dstFolderPath.toFile().exists()) {
+            int index = 0;
+            do {
+                dstFolderPath = Path.of(dstBaseFolderPath.toString(), index + "-" + this.folderName).normalize();
+                index++;
+            } while (dstFolderPath.toFile().exists());
+        }
+
         Files.createDirectory(dstFolderPath);  // TODO Handle directory already exist
 
         return dstFolderPath.getFileName().toString();
