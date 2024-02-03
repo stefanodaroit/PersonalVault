@@ -36,7 +36,7 @@ import javafx.stage.Stage;
 
 public class ManageVaultBox extends VBox {
 
-  private static final double WIDTH = 300, HEIGHT = 200, SPACING = 10, PADDING = 10;
+  private static final double WIDTH = 300, HEIGHT = 250, SPACING = 10, PADDING = 10;
   
   private Vault vault;
 
@@ -44,6 +44,8 @@ public class ManageVaultBox extends VBox {
   private ListView<Vault> listView;
   private FileSystemTreeView treeView;
   private TreeItem<String> selectedItem;
+  private Path   vaultPath;
+  private Path unlockPath;
 
   public ManageVaultBox(Stage stage, ListView<Vault> listView, Vault vault) {
     super();
@@ -70,7 +72,9 @@ public class ManageVaultBox extends VBox {
   }
 
   private void setLockedPane() {
+
     final Button unlockBtn = new Button("Unlock");
+
     unlockBtn.setOnAction(event -> {
       final Stage unlockStage = new Stage();
 
@@ -84,7 +88,33 @@ public class ManageVaultBox extends VBox {
       centerBox.setAlignment(Pos.CENTER);
       centerBox.setPadding(new Insets(PADDING));
       
-      // TODO Add directorychooser for reveal path
+      // Top box with directory chooser
+      final VBox topBox = new VBox(SPACING);
+
+      final Label lbl  = new Label("Choose a location where to unlock your vault");
+      final Label lbl2 = new Label("You selected the following location:");
+      final Label location = new Label(this.unlockPath != null ? this.unlockPath.toString() : "");
+      
+      final DirectoryChooser directoryChooser = new DirectoryChooser();
+      directoryChooser.setTitle("Choose Unlock Location");
+      directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+
+      final Button locationBtn = new Button("Choose Location");
+      locationBtn.setOnAction(eventLoc -> {
+        // Get selected directory
+        File dir = directoryChooser.showDialog(unlockStage);
+        if (dir == null) { 
+          System.out.println("No location selected.");
+          return;
+        }
+        // Set location label
+        this.unlockPath = dir.toPath();
+        location.setText(this.unlockPath != null ? this.unlockPath.toString() : "");
+      });
+
+      topBox.getChildren().addAll(lbl, locationBtn, lbl2, location);
+      topBox.setAlignment(Pos.CENTER);
+      topBox.setPadding(new Insets(PADDING));
       
       // Bottom box with buttons
       final HBox bottomBox = new HBox(SPACING);
@@ -97,7 +127,10 @@ public class ManageVaultBox extends VBox {
       final Button confirmBtn = new Button("Unlock");
       confirmBtn.setOnAction(e -> {
         try {
-          this.vault.unlock(pswFld.getText(), this.vault.getStoragePath().resolve("..")); // Get Path from directory chooser
+          if(this.unlockPath == null){
+            new Alert(AlertType.WARNING, "The entered location is not valid", ButtonType.OK).show();
+          }
+          this.vault.unlock(pswFld.getText(), this.unlockPath); // Get Path from directory chooser
           unlockStage.close();
           this.getChildren().clear();
           setUnlockedPane();
@@ -116,6 +149,7 @@ public class ManageVaultBox extends VBox {
       
       // Main layout
       final BorderPane borderPaneNew = new BorderPane();
+      borderPaneNew.setTop(topBox);
       borderPaneNew.setCenter(centerBox);
       borderPaneNew.setBottom(bottomBox);
 
