@@ -308,7 +308,7 @@ public class VaultFile implements VaultElement {
 
     @Override
     public Path getRelativePath(Path vaultPath) {
-        return this.filenamePath;
+        return this.filenamePath.subpath(vaultPath.normalize().getNameCount(), this.filenamePath.getNameCount());
     }
 
 }

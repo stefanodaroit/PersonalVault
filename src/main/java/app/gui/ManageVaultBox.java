@@ -9,6 +9,7 @@ import java.util.Optional;
 import app.core.Vault;
 import app.core.Vault.InternalException;
 import app.core.Vault.InvalidConfigurationException;
+import app.core.Vault.InvalidMacException;
 import app.core.Vault.VaultLockedException;
 import app.core.Vault.WrongPasswordException;
 import javafx.geometry.Insets;
@@ -140,6 +141,8 @@ public class ManageVaultBox extends VBox {
           new Alert(AlertType.ERROR, "Cannot unlock vault: configuration file tampered", ButtonType.OK).show();
         } catch (InternalException exc) {
           new Alert(AlertType.ERROR, "Cannot unlock vault: internal error", ButtonType.OK).show();
+        } catch (InvalidMacException e1) {
+          new Alert(AlertType.WARNING, "Failed file integrity tree check", ButtonType.OK).show();
         }
       });
       
