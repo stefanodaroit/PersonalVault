@@ -4,11 +4,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Scanner;
 import java.util.UUID;
 
 import javax.crypto.Mac;
@@ -25,15 +28,12 @@ public class Vault {
   private String name;
   private Path storagePath;
   private Path revealPath;
-  
-  private byte[] confMac;
+  private Path treeChecksumFile;
   private boolean locked = true;
+  private byte[] confMac;
 
   private KeyManager km;
   private VaultConfiguration conf;
-
-  //private Path treeChecksumFile;
-
   private List<VaultElement> vaultFiles;
   
   /**
@@ -73,7 +73,7 @@ public class Vault {
     Files.createDirectory(this.storagePath);
 
     this.vaultFiles = new ArrayList<>();
-    //this.treeChecksumFile = Path.of(this.storagePath.toString() + "/" + this.vid + FILE_CHECKSUM_EXTENSION);
+    this.treeChecksumFile = this.storagePath.resolve(this.vid + CHKSUM_FILE_EXT);
     
     // Create and save vault configuration
     this.conf = new VaultConfiguration(this.vid, this.km.getSalt(), this.km.getWrapEncKey(), this.km.getWrapAuthKey());
@@ -104,7 +104,7 @@ public class Vault {
     this.vid = vid;
     this.name = (name != null && name.length() != 0) ? name : this.vid.toString();
     this.storagePath = storagePath.resolve(this.name);
-    //this.treeChecksumFile = Path.of(this.storagePath.toString() + "/" + this.vid + FILE_CHECKSUM_EXTENSION);
+    this.treeChecksumFile = this.storagePath.resolve(this.vid + CHKSUM_FILE_EXT);
     
     try {
       // Read vault configuration and init key manager
@@ -162,17 +162,6 @@ public class Vault {
     }  
   }
 
-  private String getDirEncName(Path clearName) {
-    for (VaultElement file : this.vaultFiles) {
-      if (file instanceof VaultDirectory) {
-        VaultDirectory dir = (VaultDirectory) file;
-        if (clearName.toString().equals(dir.getFolderName())) return dir.getEncName();
-      }
-    }
-
-    return null;
-  }
-
   /**
    * Add the file to the vault
    * 
@@ -194,31 +183,38 @@ public class Vault {
   /**
    * Copy file in srcPath to storagePath/destPath; if destPath is null copies to storagePath/srcFilename
    * 
-   * @param srcPath The source file path
-   * @param dstPath The destination path
+   * @param absSrcPath The source file path
+   * @param relDstPath The destination path
    * 
    * @throws IOException If something in the copy does not work
    * @throws VaultLockedException If the vault is still locked 
    * @throws InternalException Error during encryption
    */
-  private void addFile(Path srcPath, Path dstPath) throws IOException, VaultLockedException, InternalException {
+  private void addFile(Path absSrcPath, Path relDstPath) throws IOException, VaultLockedException, InternalException {
     if (this.locked) {
       throw new VaultLockedException();
     }
+
+    Path absDstPath = this.storagePath.resolve(relDstPath);
+    String encName = "";
     
     // Encrypt file and add to the vault
     try {
       VaultElement file = null;
-      Path absDstPath = this.storagePath.resolve(dstPath);
-      if (Files.isDirectory(srcPath)) {
+      if (Files.isDirectory(absSrcPath)) {
         file = new VaultDirectory(absDstPath, false);
       } else {
         file = new VaultFile(absDstPath);
       }
-      file.encrypt(srcPath, this.km.getUnwrapEncKey());
+      encName = file.encrypt(absSrcPath, this.km.getUnwrapEncKey());
+      computeTreeChecksum(relDstPath.getParent(), encName);
       vaultFiles.add(file);
     } catch (Exception e) {
-      //e.printStackTrace();
+      if (encName.length() != 0) {
+        Path file = absDstPath.getParent().resolve(encName);
+        if (Files.exists(file)) { Files.delete(file); }
+      }
+      e.printStackTrace();
       throw new InternalException();
     }
   }
@@ -231,10 +227,11 @@ public class Vault {
    * @throws InvalidConfigurationException
    * @throws WrongPasswordException
    * @throws InternalException
+   * @throws InvalidMacException 
    * @throws IOException 
    * @throws InvalidFilesException 
    */
-  public Path unlock(String psw, Path destFolder) throws InvalidConfigurationException, WrongPasswordException, InternalException {    
+  public Path unlock(String psw, Path destFolder) throws InvalidConfigurationException, WrongPasswordException, InternalException, InvalidMacException {    
     if (!(psw != null && destFolder != null)) {
       throw new NullPointerException("Psw or dstFolder are null");
     }
@@ -264,10 +261,11 @@ public class Vault {
       System.out.println("Error while checking configuration integrity");
       throw new InvalidConfigurationException();
     }
-
-    // TODO checkFilesIntegrity();
     
     this.locked = false;
+
+    if (this.isEmpty()) { return null; }
+
     this.revealPath = destFolder.resolve(this.name + "-unlocked");
 
     try {
@@ -292,56 +290,20 @@ public class Vault {
         file.decrypt(this.revealPath.resolve(dest), this.km.getUnwrapEncKey());
       }
     } catch (Exception e) {
-      //e.printStackTrace();
+      e.printStackTrace();
       throw new InternalException();
+    }
+
+    // Check file tree integrity
+    try {
+      if (!this.checkFileTreeIntegrity()) { throw new InvalidMacException(); }
+    } catch (IOException e) {
+      System.out.println("Error while checking file tree integrity");
+      throw new InvalidMacException();
     }
     
     return this.revealPath;
   }
-
-  private String getDirClearName(Path encName) {
-    for (VaultElement file : this.vaultFiles) {
-      if (file instanceof VaultDirectory) {
-        VaultDirectory dir = (VaultDirectory) file;
-        if (encName.toString().equals(dir.getEncName())) return dir.getFolderName();
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Method used to check the files integrity
-   * 
-   * @throws InvalidFilesException
-   * @throws InternalException
-   */
-  // private void checkFilesIntegrity() throws InvalidFilesException, InternalException{
-
-  //   List<String> pathWithMac = readTreeChecksum();
-    
-  //   for(String fileMac: pathWithMac){
-  //     String path = fileMac.split(";")[0];
-  //     String macString = fileMac.split(";")[1];
-  //     byte[] mac = macString.getBytes(StandardCharsets. UTF_8);
-      
-  //     for(Path p: files){
-  //       Path newPath = p.subpath(storagePath.getNameCount(), p.getNameCount());
-  //       if(newPath.toString().equals(path)){
-
-  //         // Recompute HMAC and path
-  //         byte[] newMac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), newPath.toString().getBytes(StandardCharsets. UTF_8));
-  //         byte[] mac2 = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), path.toString().getBytes(StandardCharsets. UTF_8));
-  //         //!newPath.equals(path) || 
-
-  //         /*if(!MessageDigest.isEqual(mac, newMac)){
-  //           System.out.println("Files integrity check failed");
-  //           throw new InvalidFilesException();
-  //         }*/
-  //       }
-  //     }
-  //   }
-  // }
 
   /**
    * Change the password and set the new configuration
@@ -398,7 +360,7 @@ public class Vault {
       Path confPath = VaultConfiguration.getPath(this.storagePath, this.vid);
 
       // Check if configuration file is too large
-      if (Files.size(confPath) > MAX_TOKEN_SIZE) {
+      if (Files.size(confPath) > MAX_CONF_SIZE) {
         System.out.println("Vault configuration file is too large");
         throw new InvalidConfigurationException();
       }
@@ -547,80 +509,136 @@ public class Vault {
     return macResult;
   }
 
-  // private static Boolean isDir(Path path) {
-  //   if (path == null || !Files.exists(path)) return false;
-  //   else return Files.isDirectory(path);
-  // }
+  /**
+   * Method to compute checksum for a file
+   * 
+   * @param parent The parent directory path (encrypted)
+   * @param encName The encrypted file name 
+   * 
+   * @throws InternalException
+   * @throws IOException
+   */
+  private void computeTreeChecksum(Path parent, String encName) throws InternalException, IOException {
+    // Create filename
+    byte[] filename = (parent != null ? parent.resolve(encName).toString() : encName).getBytes();
+     
+    // Create the MAC of the dest path with auth key
+    byte[] filenameMac = getHmac(ALG_HMAC_TOK, this.km.getUnwrapAuthKey(), filename);
+    byte[] encodedMac = Base64.getEncoder().withoutPadding().encode(filenameMac);
+    
+    // Attach filename and mac using PERIOD (.)
+    byte[] checksum = new byte[filename.length + 1 + encodedMac.length];
+    System.arraycopy(filename, 0, checksum, 0, filename.length);
+    checksum[filename.length] = (byte) PERIOD;
+    System.arraycopy(encodedMac, 0, checksum, filename.length + 1, encodedMac.length);
+
+    // Write on tree checksum file
+    writeTreeChecksumToFile(checksum);
+  }
 
   /**
-   * Add the file in the tree checksum: path file;HMAC
+   * Method to check file tree integrity in the vault
    * 
-   * @param file Path  path of the file to add
+   * @return a boolean flag which indicates success or failure
+   * 
+   * @throws InternalException
    * @throws IOException
-   * @throws VaultLockedException
+   */
+  private boolean checkFileTreeIntegrity() throws InternalException, IOException {
+    System.err.print("Checking file tree integrity... ");
+    
+    HashMap<Path, byte[]> pathMac = readTreeChecksumFile();
+    if (pathMac == null) { 
+      System.err.println("Error while reading file integrity file");
+      return false; 
+    }
+
+    if (this.vaultFiles.size() != pathMac.size()) {
+      System.err.println("Number of files is different");
+      return false;
+    }
+
+    for (Path file : pathMac.keySet()) {
+      if (getVaultFile(file) == null) {
+        System.err.println("File not found");
+        return false;
+      }
+
+      byte[] newMac = getHmac(ALG_HMAC_TOK, this.km.getUnwrapAuthKey(), file.toString().getBytes());
+      if (!MessageDigest.isEqual(pathMac.get(file), newMac)) {
+        System.err.println("HMAC is not equal!");
+        return false;
+      }
+    }
+    
+    System.err.println("DONE");
+    return true;
+  }
+
+
+  /**
+   * Method to write a line on tree checksum file
+   * @param checksum
+   * 
+   * @throws IOException
+   */
+  private void writeTreeChecksumToFile(byte[] checksum) throws IOException {    
+    // Add new line to checksum
+    byte[] line = new byte[checksum.length + 1];
+    System.arraycopy(checksum, 0, line, 0, checksum.length);
+    line[line.length - 1] = '\n';
+
+    Files.write(this.treeChecksumFile, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND); 
+  }
+
+  /**
+   * Method to read the tree checksum file
+   * 
+   * @return HashMap<Path, byte[]> a hash map with path and mac bytes
+   * @throws InvalidMacException
+   * @throws IOException
+   */
+  public HashMap<Path, byte[]> readTreeChecksumFile() throws IOException {
+    HashMap<Path, byte[]> pathMac = new HashMap<>();
+
+    // Read all the lines of the file
+    try {
+      Scanner scan = new Scanner(this.treeChecksumFile.toFile());
+      while (scan.hasNextLine()) {
+        String line = scan.nextLine();
+        
+        // Check if token has 2 fields (path + mac)
+        String tok[] = line.split("\\" + PERIOD);
+        if (tok.length != 2) {
+          scan.close();
+          return null;
+        }
+        
+        // Get path and mac
+        Path path = Path.of(tok[0]);
+        byte[] decodedMac = Base64.getDecoder().decode(tok[1]);
+        
+        pathMac.put(path, decodedMac);
+      }
+      scan.close(); 
+    } catch (Exception e) {
+      throw new IOException("Mac file not found");
+    }
+
+    return pathMac;
+  }
+  
+  /**
+   * Static method to import a vault from a file path: /dir/dir2/vaultName
+   * 
+   * @param dir The directory in which the vault is stored
+   * 
+   * @return The vault object created
+   * 
+   * @throws InvalidConfigurationException
+   * @throws IOException
    * @throws InternalException
    */
-  // private void createTreeChecksum(Path file) throws IOException, VaultLockedException, InternalException{
-  
-  //   // String Joiner for the line
-  //   StringJoiner pathWithMac = new StringJoiner(";", "", "\n");
-  //   // Create the dest path without the name of the vault
-  //   Path dest = file.subpath(storagePath.getNameCount(), file.getNameCount());
-  //   // Create the MAC of the dest path with the master key
-  //   byte[] mac = getHmac(ALG_HMAC_TOK, this.km.getMasterKey(), dest.toString().getBytes(StandardCharsets. UTF_8));
-
-  //   // Add to the StringJoiner the dest path and MAC
-  //   pathWithMac.add(dest.toString());
-  //   pathWithMac.add(mac.toString());
-
-  //   // Write the StringJoiner to the tree checksum file
-  //   writeTreeChecksumToFile(pathWithMac);
-    
-  // }
-
-  // /**
-  //  * Method to add a StringJoiner in a file
-  //  * 
-  //  * @param sj StringJoiner  String to add to the file
-  //  */
-  // private void writeTreeChecksumToFile(StringJoiner sj){
-
-  //   // Open the file in append mode
-  //   try(FileWriter fw = new FileWriter(treeChecksumFile.toString(), true);
-  //       BufferedWriter bw = new BufferedWriter(fw);
-  //       PrintWriter out = new PrintWriter(bw)){
-          
-  //         // Add the StringJoiner to the file
-  //         out.print(sj.toString());
-  //   } catch (IOException e) {
-  //     System.err.println("Cannot write tree checksum file");
-  //   }
-  // }
-
-  // /**
-  //  * Method to read the tree checksum file
-  //  * 
-  //  * @return List<String>  list of path;HMAC
-  //  */
-  // public List<String> readTreeChecksum(){
-  //   // List of path;HMAC
-  //   List<String> pathWithMac = new ArrayList<>();
-
-  //   try {
-  //     // Read all the lines of the file
-  //     Scanner scan = new Scanner(treeChecksumFile.toFile());
-  //     while (scan.hasNextLine()) {
-  //       pathWithMac.add(scan.nextLine());
-  //     }
-  //     // Close the scan
-  //     scan.close();
-  //   } catch (FileNotFoundException e) {
-  //     System.out.println("Tree checksum file absent");
-  //   }
-
-  //   return pathWithMac;
-  // }
-  
   public static Vault importVault(File dir) throws InvalidConfigurationException, IOException, InternalException {
     // Check if a vault configuration file is present
     List<Path> path = Files.find(Path.of(dir.getAbsolutePath()), 1, (p, attr) -> p.getFileName().toString().endsWith(CONF_FILE_EXT)).toList();
@@ -636,6 +654,56 @@ public class Vault {
 
     // Create vault with obtained parameters and add to the list view
     return new Vault(UUID.fromString(vaultFilename), dir.getName(), Path.of(dir.getParent()));
+  }
+
+  /**
+   * Method to find a vault item given the relative path inside the vault
+   * 
+   * @param toFind relative path to find
+   * 
+   * @return the vault item
+   */
+  private VaultElement getVaultFile(Path toFind) {
+    if (toFind == null) { return null; }
+    
+    VaultElement find = null;
+    for (VaultElement file : this.vaultFiles) {
+      if (file.getRelativePath(this.storagePath).equals(toFind)) { return file; }
+    }
+    
+    return find;
+  }
+
+  /**
+   * Return the clear name of the vault item given the encrypted name
+   * @param encName The encrypted name
+   * @return The clear name
+   */
+  private String getDirClearName(Path encName) {
+    for (VaultElement file : this.vaultFiles) {
+      if (file instanceof VaultDirectory) {
+        VaultDirectory dir = (VaultDirectory) file;
+        if (encName.toString().equals(dir.getEncName())) return dir.getFolderName();
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Return the encrypted name of the vault item given the clear name
+   * @param clearName The clear name
+   * @return The encrypted name
+   */
+  private String getDirEncName(Path clearName) {
+    for (VaultElement file : this.vaultFiles) {
+      if (file instanceof VaultDirectory) {
+        VaultDirectory dir = (VaultDirectory) file;
+        if (clearName.toString().equals(dir.getFolderName())) return dir.getEncName();
+      }
+    }
+
+    return null;
   }
 
   public static boolean isConfFile(Path file) {
@@ -660,16 +728,6 @@ public class Vault {
     }
 
     return file.getFileName().toString().contains(DIR_FILE_EXT);
-  }
-
-  // Overriding equals() to compare two Vault objects
-  @Override
-  public boolean equals(Object obj) {
-    if (!(obj != null && obj instanceof Vault)) {
-      return false;
-    }
-
-    return this.getStoragePath().equals(((Vault) obj).getStoragePath());
   }
 
   public UUID getVid() {
@@ -700,14 +758,33 @@ public class Vault {
     return this.locked;
   }
 
+  public boolean isEmpty() {
+    return this.vaultFiles.size() == 0;
+  }
+
   @Override
   public String toString() {
     return this.name + '\n' + this.storagePath.toString();
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj != null && obj instanceof Vault)) {
+      return false;
+    }
+
+    return this.getStoragePath().equals(((Vault) obj).getStoragePath());
+  }
+
   public static class InvalidConfigurationException extends Exception { 
     public InvalidConfigurationException() { 
       super("Invalid configuration file"); 
+    }
+  }
+
+  public static class InvalidMacException extends Exception { 
+    public InvalidMacException() { 
+      super("Invalid tree integrity file"); 
     }
   }
 
