@@ -29,7 +29,6 @@ public class VaultFile implements VaultElement {
     /**
      * Instantiate a file operation
      *
-     * @param folderPath base directory
      * @param filenamePath   name of the file to open
      * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
@@ -203,6 +202,16 @@ public class VaultFile implements VaultElement {
 
         dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
         Path dstFilePath = Path.of(dstFolderPath.toString(), originalFilename).normalize();
+
+        // if a file with the same name already exists, we append an index to the new one to not overwrite the previous one
+        if (dstFilePath.toFile().exists()) {
+            int index = 0;
+            do {
+                dstFilePath = Path.of(dstFolderPath.toString(), index + "-" + originalFilename).normalize();
+                index++;
+            } while (dstFilePath.toFile().exists());
+        }
+
         try {
             this.decryptContent(dstFilePath, inputData, dstFileSize);
         } catch (Exception e) {
@@ -278,7 +287,7 @@ public class VaultFile implements VaultElement {
 
         byte[] iv = new byte[IVLEN];
         ByteArrayInputStream is = new ByteArrayInputStream(contentData); // input file stream to read chunks
-        OutputStream outputFile = Files.newOutputStream(outputFilePath); // TODO Handle file already exist
+        OutputStream outputFile = Files.newOutputStream(outputFilePath);
 
         // chunk: first part is IV, then the actual content plus the TAG_LEN bytes GCM authentication tag
         byte[] buffer = new byte[IVLEN + CHUNK_SIZE + TAG_LEN];
