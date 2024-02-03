@@ -4,6 +4,7 @@ import static app.core.Constants.VAULT_NAME_RGX;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
 import app.core.Vault;
@@ -30,7 +31,7 @@ public class NewVaultStage extends Stage {
   private static final String BACK = "Back", NEXT = "Next";
 
   private String vaultName;
-  private String vaultPath;
+  private Path   vaultPath;
   private String vaultPsw;
 
   private List<Vault> listVault;
@@ -39,7 +40,7 @@ public class NewVaultStage extends Stage {
     super();
     
     this.vaultName = "";
-    this.vaultPath = "";
+    this.vaultPath = null;
     this.vaultPsw  = "";
     this.listVault = listVaultView.getItems();
     
@@ -99,7 +100,7 @@ public class NewVaultStage extends Stage {
     
     final Label lbl  = new Label("Choose a location where to store your vault");
     final Label lbl2 = new Label("You selected the following location:");
-    final Label location = new Label(this.vaultPath);
+    final Label location = new Label(this.vaultPath != null ? this.vaultPath.toString() : "");
     
     final DirectoryChooser directoryChooser = new DirectoryChooser();
     directoryChooser.setTitle("Choose Storage Location");
@@ -114,8 +115,8 @@ public class NewVaultStage extends Stage {
         return;
       }
       // Set location label
-      this.vaultPath = dir.getAbsolutePath();
-      location.setText(this.vaultPath);
+      this.vaultPath = dir.toPath();
+      location.setText(this.vaultPath != null ? this.vaultPath.toString() : "");
     });
 
     centerBox.setAlignment(Pos.CENTER);
@@ -133,7 +134,7 @@ public class NewVaultStage extends Stage {
     final Button nextBtn = new Button(NEXT);
     nextBtn.setOnAction(event -> { 
       // Assure that the user selected a path
-      if (this.vaultPath.length() != 0) {
+      if (this.vaultPath != null) {
         this.setScene(setPasswordScene());
       } else {
        new Alert(AlertType.WARNING, "You did not choose a location for the vault!", ButtonType.OK).show();

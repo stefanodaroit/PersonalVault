@@ -16,13 +16,16 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class Directory {
+public class VaultDirectory implements VaultElement{
 
-    private final Path folderPath; // "./dir/dir2/"
+    private final Path folderPath; // "/dir"
+    private final Path folderNamePath; // "/dir/dir2"
     private final SecureRandom gen; // random bytes generator
     private final Cipher c;
     private byte[] headerIV; // Initialization Vector of the header
+    
     private String encName; // updated by encryptHeader, it is the encrypted directory name
+    private String folderName; // "dir2"
 
     /**
      * Instantiate a directory operation
@@ -32,21 +35,27 @@ public class Directory {
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
-    public Directory(String folderPath) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
-        if (folderPath == null) throw new IOException("path cannot be null");
-        this.folderPath = Path.of(folderPath).normalize();
+    public VaultDirectory(Path folderNamePath, boolean encrypted) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+        if (folderNamePath == null) throw new IOException("path cannot be null");
+        
+        this.folderNamePath = folderNamePath.normalize();
+        this.folderPath =  this.folderNamePath.getParent() != null ? this.folderNamePath.getParent() : Path.of(".");;
+        if (encrypted) {
+            this.encName = this.folderNamePath.getFileName().toString();
+        } else {
+            this.folderName = this.folderNamePath.getFileName().toString();
+        }        
 
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
-        this.encName = "";
     }
 
     /**
      * Public method to encrypt the directory name
      *
      * @param encKey            key used to encrypt the header
-     * @param dstBaseFolderPath destination folder path of output
+     * @param srcPath destination folder path of output
      * @return the encrypted directory name
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
@@ -55,15 +64,15 @@ public class Directory {
      * @throws BadPaddingException
      * @throws IOException                        destination folder path cannot be null or other IO exceptions
      */
-    public String encrypt(SecretKey encKey, Path dstBaseFolderPath) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+    public String encrypt(Path srcPath, SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
-        if (dstBaseFolderPath == null) throw new IOException("destination folder path cannot be null");
+        if (srcPath == null) throw new IOException("destination folder path cannot be null");
 
         byte[] encHeader = this.encryptHeader(encKey);
 
         String encDestinationStr = this.encName;
-        dstBaseFolderPath = dstBaseFolderPath.normalize(); // remove redundant elements
-        Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), encDestinationStr);
+        srcPath = srcPath.normalize(); // remove redundant elements
+        Path dstFolderPath = this.folderPath.resolve(encDestinationStr);
         Files.createDirectory(dstFolderPath);
 
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encDestinationStr + ".dir")); // encrypted file output
@@ -88,7 +97,7 @@ public class Directory {
         GCMParameterSpec spec = new GCMParameterSpec(TAG_LEN_BITS, headerIV);
         this.c.init(Cipher.ENCRYPT_MODE, encKey, spec, this.gen);
 
-        byte[] filenameBytes = this.folderPath.getFileName().toString().getBytes();
+        byte[] filenameBytes = this.folderName.getBytes();
         if (filenameBytes.length > FILENAME_MAX_SIZE) {
             throw new IllegalBlockSizeException("filename should be <= " + FILENAME_MAX_SIZE + " bytes, instead it is" + filenameBytes.length + " bytes long");
         }
@@ -126,20 +135,20 @@ public class Directory {
      * @throws InvalidKeyException                encryption key cannot be null
      * @throws IOException                        destination folder path cannot be null or other IO exceptions
      */
-    public String decrypt(SecretKey encKey, Path dstBaseFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
+    public String decrypt(Path dstBaseFolderPath, SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstBaseFolderPath == null) throw new IOException("destination folder path cannot be null");
 
-        Path directoryName = this.folderPath;
+        Path directoryName = this.folderNamePath;
         Path directoryFile = Path.of(directoryName.toString(), directoryName.getFileName() + ".dir");
 
         int dstFileSize = (int) Files.size(directoryFile); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(directoryFile); // input file stream
-        String originalName = this.decryptHeader(encKey, inputData, dstFileSize);
+        this.folderName = this.decryptHeader(encKey, inputData, dstFileSize);
 
         dstBaseFolderPath = dstBaseFolderPath.normalize(); // remove redundant elements
-        Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), originalName).normalize();
-        Files.createDirectory(dstFolderPath);
+        Path dstFolderPath = Path.of(dstBaseFolderPath.toString(), this.folderName).normalize();
+        Files.createDirectory(dstFolderPath);  // TODO Handle directory already exist
 
         return dstFolderPath.getFileName().toString();
     }
@@ -164,7 +173,7 @@ public class Directory {
             throw new IllegalArgumentException("file size " + inputSize + "B is not long as expected " + headerFullSize + "B");
 
         byte[] encrypted = new byte[headerFullSize];
-        int _inputBytesRead = inputData.read(encrypted);
+        inputData.read(encrypted);
 
         // first part of the full header data is the IV
         System.arraycopy(encrypted, 0, this.headerIV, 0, IVLEN);
@@ -188,5 +197,16 @@ public class Directory {
         return folderStr;
     }
 
+    public String getEncName() {
+        return this.encName;
+    }
 
+    public String getFolderName() {
+        return this.folderName;
+    }
+
+    @Override
+    public Path getRelativePath(Path vaultPath) {
+        return this.folderNamePath.subpath(vaultPath.normalize().getNameCount(), this.folderNamePath.getNameCount());
+    }
 }

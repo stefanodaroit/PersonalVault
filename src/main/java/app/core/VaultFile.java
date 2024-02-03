@@ -15,7 +15,7 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class File extends Directory {
+public class VaultFile implements VaultElement {
 
     private final Path folderPath; // "./dir/dir2/"
     private final String filename; // "file.txt"
@@ -30,22 +30,17 @@ public class File extends Directory {
      * Instantiate a file operation
      *
      * @param folderPath base directory
-     * @param filename   name of the file to open
+     * @param filenamePath   name of the file to open
      * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
-    public File(String folderPath, String filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
-        super(folderPath);
-        if (filename == null) throw new IOException("filename cannot be null");
+    public VaultFile(Path filenamePath) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+        if (filenamePath == null) throw new IOException("filename cannot be null");
 
-        this.folderPath = Path.of(folderPath).normalize();
-        this.filename = Path.of(filename).normalize().getFileName().toString();
-
-        this.filenamePath = Path.of(this.folderPath.toString(), this.filename);
-        if (!(new java.io.File(this.filenamePath.toString()).isFile())) {
-            throw new IOException("Path '" + this.filenamePath + "' is not a file or not found");
-        }
+        this.filenamePath = filenamePath.normalize();
+        this.folderPath = this.filenamePath.getParent() != null ? this.filenamePath.getParent() : Path.of(".");
+        this.filename = this.filenamePath.getFileName().toString();
 
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
@@ -57,7 +52,7 @@ public class File extends Directory {
      * Public method to encrypt the file
      *
      * @param encKey        key to use to encrypt the header
-     * @param dstFolderPath destination folder path of the output file
+     * @param srcPath destination folder path of the output file
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
@@ -66,16 +61,20 @@ public class File extends Directory {
      * @throws BadPaddingException
      * @throws IOException
      */
-    public String encrypt(SecretKey encKey, Path dstFolderPath) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+    public String encrypt(Path srcPath, SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
-        if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
+        if (srcPath == null) throw new IOException("destination folder path cannot be null");
+
+        if (!(srcPath.toFile().isFile())) {
+            throw new IOException("Path '" + srcPath + "' is not a file or not found");
+        }
 
         byte[] encHeader = this.encryptHeader(encKey);
-        byte[] encContent = this.encryptContent();
+        byte[] encContent = this.encryptContent(srcPath);
 
         String encFilenameStr = Path.of(this.encFilename.toString()).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
-        dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
-        OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encFilenameStr)); // encrypted file output
+        srcPath = srcPath.normalize(); // remove redundant elements
+        OutputStream encryptedOutput = Files.newOutputStream(Path.of(this.folderPath.toString(), encFilenameStr)); // encrypted file output
 
         encryptedOutput.write(encHeader);
         encryptedOutput.write(encContent);
@@ -147,10 +146,10 @@ public class File extends Directory {
      * @throws IllegalBlockSizeException
      * @throws BadPaddingException
      */
-    private byte[] encryptContent() throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    private byte[] encryptContent(Path srcPath) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         byte[] iv = new byte[IVLEN];
 
-        InputStream is = Files.newInputStream(this.filenamePath); // input file stream
+        InputStream is = Files.newInputStream(srcPath); // input file stream
         ByteArrayOutputStream temp = new ByteArrayOutputStream(); // temporary output stream
 
         byte[] buffer = new byte[CHUNK_SIZE];
@@ -192,7 +191,7 @@ public class File extends Directory {
      * @throws InvalidKeyException
      * @throws IOException
      */
-    public String decrypt(SecretKey encKey, Path dstFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
+    public String decrypt(Path dstFolderPath, SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
@@ -230,7 +229,7 @@ public class File extends Directory {
     private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         int headerFullSize = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + TAG_LEN; // last TAG_LEN bytes are GCM authentication tag
         byte[] encrypted = new byte[headerFullSize];
-        int _inputBytesRead = inputData.read(encrypted);
+        inputData.read(encrypted);
 
         // first part of the full header data is the IV
         System.arraycopy(encrypted, 0, this.headerIV, 0, IVLEN);
@@ -275,11 +274,11 @@ public class File extends Directory {
         final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + TAG_LEN;
 
         byte[] contentData = new byte[inputSize - HEADER_FULL_SIZE];
-        int _fileBytesRead = fileData.read(contentData);
+        fileData.read(contentData);
 
         byte[] iv = new byte[IVLEN];
         ByteArrayInputStream is = new ByteArrayInputStream(contentData); // input file stream to read chunks
-        OutputStream outputFile = Files.newOutputStream(outputFilePath);
+        OutputStream outputFile = Files.newOutputStream(outputFilePath); // TODO Handle file already exist
 
         // chunk: first part is IV, then the actual content plus the TAG_LEN bytes GCM authentication tag
         byte[] buffer = new byte[IVLEN + CHUNK_SIZE + TAG_LEN];
@@ -305,6 +304,11 @@ public class File extends Directory {
 
         is.close();
         outputFile.close();
+    }
+
+    @Override
+    public Path getRelativePath(Path vaultPath) {
+        return this.filenamePath;
     }
 
 }

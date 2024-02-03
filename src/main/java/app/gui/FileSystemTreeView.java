@@ -1,11 +1,10 @@
 package app.gui;
 
-import static app.core.Constants.CONF_FILE_EXT;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import app.core.Vault;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
@@ -67,10 +66,10 @@ public class FileSystemTreeView extends TreeView<String> {
   private TreeItem<String> addItem(TreeItem<String> parent, Path file) {
     if (!(parent != null && file != null)) { return null; }
 
-    String filename = file.getFileName().toString();
     // Avoid to display the vault configuration
-    if (filename.contains(CONF_FILE_EXT)) { return null; }
+    if (Vault.isConfFile(file) || Vault.isMacFile(file)) { return null; }
     
+    String filename = file.getFileName().toString();
     TreeItem<String> item = new TreeItem<>(filename);
     
     // If the file is a directory recall the function with the directory as path
