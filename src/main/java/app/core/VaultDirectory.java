@@ -142,6 +142,9 @@ public class VaultDirectory implements VaultElement{
         Path directoryName = this.folderNamePath;
         Path directoryFile = Path.of(directoryName.toString(), directoryName.getFileName() + ".dir");
 
+        if (Files.size(directoryFile) >= Integer.MAX_VALUE) {
+            throw new IOException("File '" + directoryFile + "' is too large");
+        }
         int dstFileSize = (int) Files.size(directoryFile); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(directoryFile); // input file stream
         this.folderName = this.decryptHeader(encKey, inputData, dstFileSize);

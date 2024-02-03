@@ -195,6 +195,9 @@ public class VaultFile implements VaultElement {
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
         Path inputFilePath = this.filenamePath;
+        if (Files.size(inputFilePath) >= Integer.MAX_VALUE) {
+            throw new IOException("File '" + inputFilePath + "' is too large");
+        }
         int dstFileSize = (int) Files.size(inputFilePath); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
