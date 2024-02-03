@@ -4,7 +4,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
 
 import java.security.SecureRandom;
 import java.util.Random;
@@ -13,6 +12,7 @@ import app.core.KeyDerivator;
 import app.core.KeyDerivator.InvalidPasswordException;
 import app.core.KeyDerivator.InvalidSaltException;
 import static app.core.Constants.SALT_LENGTH;
+import static org.junit.Assert.*;
 
 /**
  * Unit test for KeyDerivator class
@@ -130,6 +130,20 @@ public class KeyDerivatorTest{
     byte[] hashedBytes2 = kd2.getMasterKey();
 
     assertEquals(new SecretKeySpec(hashedBytes, "AES"), new SecretKeySpec(hashedBytes2, "AES"));
+  }
+
+  @Test
+  public void testIsBreachedPassword() {
+    String password = "ciao";
+    boolean res = KeyDerivator.isBreached(password);
+    assertTrue(res);
+  }
+
+  @Test
+  public void testIsNotBreachedPassword() {
+    String password = "dhfmn284BBB'''13.";
+    boolean res = KeyDerivator.isBreached(password);
+    assertFalse(res);
   }
   
 }
