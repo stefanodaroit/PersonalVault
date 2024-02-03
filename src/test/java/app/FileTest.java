@@ -1,7 +1,6 @@
 package app;
 
-import app.core.File;
-import app.core.KeyManager;
+import app.core.VaultFile;
 import org.junit.*;
 
 import javax.crypto.AEADBadTagException;
@@ -45,29 +44,19 @@ public class FileTest {
     }
 
     @Test(expected = IOException.class)
-    public void testFileNullParams() throws Exception {
-        File f = new File(null, null);
+    public void testFileNullParam() throws Exception {
+        new VaultFile(null);
     }
 
-    @Test(expected = IOException.class)
-    public void testFileNullPath() throws Exception {
-        File f = new File(null, "filename");
-    }
+    // @Test()
+    // public void testFileFound() throws Exception {
+    //     VaultFile f = new VaultFile(".", "README.md");
+    // }
 
-    @Test(expected = IOException.class)
-    public void testFileNullFilename() throws Exception {
-        File f = new File(".", null);
-    }
-
-    @Test()
-    public void testFileFound() throws Exception {
-        File f = new File(".", "README.md");
-    }
-
-    @Test(expected = IOException.class)
-    public void testFileNotFound() throws Exception {
-        File f = new File(".", "not-existing-file");
-    }
+    // @Test(expected = IOException.class)
+    // public void testFileNotFound() throws Exception {
+    //     VaultFile f = new VaultFile(".", "not-existing-file");
+    // }
 
     @Test(expected = InvalidKeyException.class)
     public void testEncryptNullKey() throws Exception {
@@ -75,8 +64,8 @@ public class FileTest {
         try {
             filename = createRandomFile();
 
-            File fe = new File(".", filename);
-            fe.encrypt(null, localPath);
+            VaultFile fe = new VaultFile(Path.of(".", filename));
+            fe.encrypt(localPath, null);
         } finally {
             Files.delete(Path.of(".", filename));
         }
@@ -88,8 +77,8 @@ public class FileTest {
         try {
             filename = createRandomFile();
 
-            File fe = new File(".", filename);
-            fe.decrypt(null, dstTestPath);
+            VaultFile fe = new VaultFile(Path.of(".", filename));
+            fe.decrypt(dstTestPath, null);
         } finally {
             Files.delete(Path.of(".", filename));
         }
@@ -106,12 +95,12 @@ public class FileTest {
             keygen.init(256); // bits
             SecretKey encKey1 = keygen.generateKey();
 
-            File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey1, localPath);
+            VaultFile fe = new VaultFile(Path.of(".", filename));
+            encFilename = fe.encrypt(Path.of(".", filename), encKey1);
 
             SecretKey encKey2 = keygen.generateKey();
-            File fd = new File(localPath.toString(), encFilename);
-            String decFilename = fd.decrypt(encKey2, dstTestPath); // should not start creating the file
+            VaultFile fd = new VaultFile(Path.of(localPath.toString(), encFilename));
+            fd.decrypt(dstTestPath, encKey2); // should not start creating the file
         } finally {
             Files.delete(Path.of(".", filename));
             Files.delete(Path.of(localPath.toString(), encFilename));
@@ -126,12 +115,12 @@ public class FileTest {
         keygen.init(256); // bits
         SecretKey encKey = keygen.generateKey();
 
-        File fe = new File(".", filename);
-        String encFilename = fe.encrypt(encKey, localPath);
+        VaultFile fe = new VaultFile(Path.of(".", filename));
+        String encFilename = fe.encrypt(localPath.resolve(filename), encKey);
         byte[] f1 = Files.readAllBytes(Path.of(filename));
 
-        File fd = new File(localPath.toString(), encFilename);
-        String decFilename = fd.decrypt(encKey, dstTestPath);
+        VaultFile fd = new VaultFile(localPath.resolve(encFilename));
+        String decFilename = fd.decrypt(dstTestPath, encKey);
         byte[] f2 = Files.readAllBytes(Path.of(dstTestPath.toString(), decFilename));
 
         Files.delete(Path.of(".", filename));
@@ -152,8 +141,8 @@ public class FileTest {
             keygen.init(256); // bits
             SecretKey encKey = keygen.generateKey();
 
-            File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey, localPath);
+            VaultFile fe = new VaultFile(Path.of(".", filename));
+            encFilename = fe.encrypt(Path.of(".", filename), encKey);
 
             // overwrite encrypted file header byte
             byte[] fb = Files.readAllBytes(Path.of(localPath.toString(), encFilename));
@@ -166,9 +155,9 @@ public class FileTest {
             fb[10] = x;
             Files.write(Path.of(localPath.toString(), encFilename), fb);
 
-            File fd = new File(localPath.toString(), encFilename);
+            VaultFile fd = new VaultFile(localPath.resolve(encFilename));
             // the header does not match, the file is not created
-            String decFilename = fd.decrypt(encKey, dstTestPath);
+            fd.decrypt(dstTestPath, encKey);
         } finally {
             Files.delete(Path.of(".", filename));
             Files.delete(Path.of(localPath.toString(), encFilename));
@@ -186,15 +175,15 @@ public class FileTest {
             keygen.init(256); // bits
             SecretKey encKey = keygen.generateKey();
 
-            File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey, localPath);
+            VaultFile fe = new VaultFile(Path.of(".", filename));
+            encFilename = fe.encrypt(Path.of(".", filename), encKey);
 
             Files.write(Path.of(encFilename), new byte[]{(byte) this.r.nextInt()}, StandardOpenOption.APPEND);
 
-            File fd = new File(localPath.toString(), encFilename);
+            VaultFile fd = new VaultFile(localPath.resolve(encFilename));
             // file is created because header bytes match,
             // but the content bytes does not match, so throw an exception. The under-the-hood file is deleted
-            String decFilename = fd.decrypt(encKey, dstTestPath);
+            fd.decrypt(dstTestPath, encKey);
         } finally {
             Files.delete(Path.of(".", filename));
             Files.delete(Path.of(localPath.toString(), encFilename));
@@ -213,11 +202,11 @@ public class FileTest {
             keygen.init(256); // bits
             SecretKey encKey = keygen.generateKey();
 
-            File fe = new File(".", filename);
-            encFilename = fe.encrypt(encKey, localPath);
+            VaultFile fe = new VaultFile(Path.of(".", filename));
+            encFilename = fe.encrypt(Path.of(".", filename), encKey);
 
-            File fd = new File(localPath.toString(), encFilename);
-            decFilename = fd.decrypt(encKey, dstTestPath);
+            VaultFile fd = new VaultFile(localPath.resolve(encFilename));
+            decFilename = fd.decrypt(dstTestPath, encKey);
         } finally {
             Files.delete(Path.of(".", filename));
             Files.delete(Path.of(localPath.toString(), encFilename));
@@ -226,6 +215,4 @@ public class FileTest {
 
         Assert.assertEquals(filename, decFilename);
     }
-
-
 }

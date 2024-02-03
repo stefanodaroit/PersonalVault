@@ -1,7 +1,6 @@
 package app;
 
-import app.core.Directory;
-import app.core.File;
+import app.core.VaultDirectory;
 import org.junit.*;
 
 import javax.crypto.AEADBadTagException;
@@ -40,12 +39,12 @@ public class DirectoryTest {
 
     @Test(expected = IOException.class)
     public void testDirNullParam() throws Exception {
-        Directory d = new Directory(null);
+        new VaultDirectory(null, false);
     }
 
     @Test()
     public void testDirFound() throws Exception {
-        Directory d = new Directory("./tmp");
+        new VaultDirectory(Path.of("./tmp"), false);
     }
 
     /*@Test(expected = IOException.class)
@@ -60,38 +59,38 @@ public class DirectoryTest {
 
     @Test(expected = InvalidKeyException.class)
     public void testEncryptNullKey() throws Exception {
-        Directory de = new Directory("./tmp");
-        de.encrypt(null, this.dstTestPath);
+        VaultDirectory de = new VaultDirectory(Path.of("./tmp"), false);
+        de.encrypt(this.dstTestPath, null);
     }
 
     @Test(expected = InvalidKeyException.class)
     public void testDecryptNullKey() throws Exception {
-        Directory de = new Directory("./tmp");
-        de.decrypt(null, this.dstTestPath);
+        VaultDirectory de = new VaultDirectory(Path.of("./tmp"), true);
+        de.decrypt(this.dstTestPath, null);
     }
 
     @Test(expected = IOException.class)
     public void testEncryptNullDstPath() throws Exception {
-        Directory de = new Directory("./tmp");
-        de.encrypt(this.encKey, null);
+        VaultDirectory de = new VaultDirectory(Path.of("./tmp"), false);
+        de.encrypt(null, this.encKey);
     }
 
     @Test(expected = IOException.class)
     public void testDecryptNullDstPath() throws Exception {
-        Directory de = new Directory("./tmp");
-        de.decrypt(this.encKey, null);
+        VaultDirectory de = new VaultDirectory(Path.of("./tmp"), true);
+        de.decrypt(null, this.encKey);
     }
 
     @Test(expected = AEADBadTagException.class)
     public void testDirDifferentKey() throws Exception {
         String encName = "not-existing-enc";
         try {
-            Directory de = new Directory("./tmp");
-            encName = de.encrypt(encKey, dstTestPath);
+            VaultDirectory de = new VaultDirectory(dstTestPath.resolve("tmp"), false);
+            encName = de.encrypt(dstTestPath, encKey);
 
             SecretKey encKey2 = keygen.generateKey();
-            Directory dd = new Directory(Path.of(dstTestPath.toString(), encName).toString());
-            String decName = dd.decrypt(encKey2, dstTestPath); // should not start creating the file
+            VaultDirectory dd = new VaultDirectory(dstTestPath.resolve(encName), true);
+            dd.decrypt(dstTestPath, encKey2); // should not start creating the file
         } finally {
             Files.delete(Path.of(dstTestPath.toString(), encName, encName + ".dir"));
             Files.delete(Path.of(dstTestPath.toString(), encName));
@@ -103,11 +102,11 @@ public class DirectoryTest {
         String encName = "not-existing-enc";
         String decName = "not-existing-dec";
         try {
-            Directory de = new Directory("./tmp"); // simplified to one subfolder
-            encName = de.encrypt(encKey, dstTestPath);
+            VaultDirectory de = new VaultDirectory(dstTestPath.resolve("tmp"), false); // simplified to one subfolder
+            encName = de.encrypt(dstTestPath, encKey);
 
-            Directory dd = new Directory(Path.of(dstTestPath.toString(), encName).toString());
-            decName = dd.decrypt(encKey, dstTestPath);
+            VaultDirectory dd = new VaultDirectory(dstTestPath.resolve(encName), true);
+            decName = dd.decrypt(dstTestPath, encKey);
         } finally {
             Files.delete(Path.of(dstTestPath.toString(), encName, encName + ".dir"));
             Files.delete(Path.of(dstTestPath.toString(), encName));
@@ -122,8 +121,8 @@ public class DirectoryTest {
         String encName = "not-existing-enc";
         String decName = "not-existing-dec";
         try {
-            Directory de = new Directory("./tmp");
-            encName = de.encrypt(encKey, dstTestPath);
+            VaultDirectory de = new VaultDirectory(dstTestPath.resolve("tmp"), false);
+            encName = de.encrypt(dstTestPath, encKey);
 
             // overwrite encrypted file header byte
             byte[] fb = Files.readAllBytes(Path.of(dstTestPath.toString(), encName, encName + ".dir"));
@@ -136,8 +135,8 @@ public class DirectoryTest {
             fb[0] = x;
             Files.write(Path.of(dstTestPath.toString(), encName, encName + ".dir"), fb);
 
-            Directory dd = new Directory(Path.of(dstTestPath.toString(), encName).toString());
-            decName = dd.decrypt(encKey, dstTestPath); // should not start creating the file
+            VaultDirectory dd = new VaultDirectory(dstTestPath.resolve(encName), true);
+            decName = dd.decrypt(dstTestPath, encKey); // should not start creating the file
         } finally {
             Files.delete(Path.of(dstTestPath.toString(), encName, encName + ".dir"));
             Files.delete(Path.of(dstTestPath.toString(), encName));

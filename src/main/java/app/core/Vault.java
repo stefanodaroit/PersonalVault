@@ -2,7 +2,6 @@ package app.core;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
@@ -25,6 +24,7 @@ public class Vault {
   private final UUID vid;
   private String name;
   private Path storagePath;
+  private Path revealPath;
   
   private byte[] confMac;
   private boolean locked = true;
@@ -46,7 +46,7 @@ public class Vault {
    * @throws InternalException
    * @throws InvalidPasswordException
    */
-  public Vault(String name, String storagePath, String psw) throws IOException, InternalException, InvalidPasswordException {
+  public Vault(String name, Path storagePath, String psw) throws IOException, InternalException, InvalidPasswordException {
     if (storagePath == null || psw == null) {
       throw new NullPointerException("Null vault parameter");
     }
@@ -69,7 +69,7 @@ public class Vault {
       throw new InternalException();
     }
 
-    this.storagePath = Path.of(storagePath, this.name);
+    this.storagePath = storagePath.resolve(this.name).normalize();
     Files.createDirectory(this.storagePath);
 
     this.vaultFiles = new ArrayList<>();
@@ -92,7 +92,7 @@ public class Vault {
    * @throws IOException
    * @throws InternalException 
    */
-  public Vault(UUID vid, String name, String storagePath) throws InvalidConfigurationException, IOException, InternalException {
+  public Vault(UUID vid, String name, Path storagePath) throws InvalidConfigurationException, IOException, InternalException {
     if (storagePath == null || vid == null) {
       throw new NullPointerException("Invalid vault parameters");
     }
@@ -103,7 +103,7 @@ public class Vault {
     
     this.vid = vid;
     this.name = (name != null && name.length() != 0) ? name : this.vid.toString();
-    this.storagePath = Path.of(storagePath, this.name);
+    this.storagePath = storagePath.resolve(this.name);
     //this.treeChecksumFile = Path.of(this.storagePath.toString() + "/" + this.vid + FILE_CHECKSUM_EXTENSION);
     
     try {
@@ -117,9 +117,10 @@ public class Vault {
     // Add vault files to the list
     this.vaultFiles = new ArrayList<>();
     try {
-      for (Path file : Files.walk(this.storagePath).filter(Files::isRegularFile).toList()) {
-        if (!(isConfFile(file) || isMacFile(file))) {
-          vaultFiles.add(new VaultFile(file));
+      for (Path file : Files.walk(this.storagePath).toList()) {
+        if (!(isConfFile(file) || isMacFile(file) || isDirFile(file) || file.equals(this.storagePath))) {
+          VaultElement vaultFile = Files.isDirectory(file) ? new VaultDirectory(file, true) : new VaultFile(file);
+          vaultFiles.add(vaultFile);
         }
       }
     } catch (IOException e) {
@@ -142,30 +143,30 @@ public class Vault {
     if (!(path != null && Files.exists(path))) {
       throw new IllegalArgumentException("Invalid directory");
     }
-    
+    path = path.normalize();
     // Loop over the source directory content
     for (Path file : Files.walk(path).toList()) {
-      // Copy file considering the subdirectories
+      // Get relative path within the vault
       Path dest = file.subpath(path.getNameCount() - 1, file.getNameCount());
-      
+      // If there are subdirectories compute the path with encrypted names
       if (dest.getNameCount() > 1) {
         Path destEnc = Path.of("");
+        // For each directory get the encrypted name and compose the path
         for (int i = 0; i < dest.getNameCount() - 1; i++) {
-          String enc = getDirectory(dest.getName(i)).getEncName();
-          destEnc = destEnc.resolve(enc);
+          String enc = getDirEncName(dest.getName(i));
+          if (enc != null) destEnc = destEnc.resolve(enc);
         }
         dest = destEnc.resolve(dest.getFileName());
       }
-      
       addFile(file, dest);
     }  
   }
 
-  private VaultDirectory getDirectory(Path clearName) {
+  private String getDirEncName(Path clearName) {
     for (VaultElement file : this.vaultFiles) {
       if (file instanceof VaultDirectory) {
         VaultDirectory dir = (VaultDirectory) file;
-        if (clearName.equals(dir.getFolderName())) return dir;
+        if (clearName.toString().equals(dir.getFolderName())) return dir.getEncName();
       }
     }
 
@@ -210,13 +211,14 @@ public class Vault {
       VaultElement file = null;
       Path absDstPath = this.storagePath.resolve(dstPath);
       if (Files.isDirectory(srcPath)) {
-        file = new VaultDirectory(absDstPath);
+        file = new VaultDirectory(absDstPath, false);
       } else {
         file = new VaultFile(absDstPath);
       }
       file.encrypt(srcPath, this.km.getUnwrapEncKey());
       vaultFiles.add(file);
     } catch (Exception e) {
+      //e.printStackTrace();
       throw new InternalException();
     }
   }
@@ -232,7 +234,11 @@ public class Vault {
    * @throws IOException 
    * @throws InvalidFilesException 
    */
-  public void unlock(String psw) throws InvalidConfigurationException, WrongPasswordException, InternalException {
+  public Path unlock(String psw, Path destFolder) throws InvalidConfigurationException, WrongPasswordException, InternalException {    
+    if (!(psw != null && destFolder != null)) {
+      throw new NullPointerException("Psw or dstFolder are null");
+    }
+    
     try {
       // Unwrap secret keys through input password
       this.km.unwrapSecretKeys(psw);
@@ -259,14 +265,49 @@ public class Vault {
       throw new InvalidConfigurationException();
     }
 
-    //checkFilesIntegrity();
+    // TODO checkFilesIntegrity();
     
     this.locked = false;
+    this.revealPath = destFolder.resolve(this.name + "-unlocked");
 
-    // Path dst = Path.of("/mnt/c/Users/stefa/Desktop");
-    // for (VaultFile file : this.vaultFiles) {
+    try {
+      Files.createDirectory(this.revealPath);
+      for (VaultElement file : this.vaultFiles) {
+        // Get relative path within the vault
+        Path dest = file.getRelativePath(this.storagePath);
+        if (dest.getNameCount() == 1) {
+          dest = Path.of(".");
+        }         
+        // If there are subdirectories compute the path with decrypted names
+        else if (dest.getNameCount() > 1) {
+          Path destClear = Path.of("");
+          // For each directory get the encrypted name and compose the path
+          for (int i = 0; i < dest.getNameCount() - 1; i++) {
+            String clear = getDirClearName(dest.getName(i));
+            if (clear != null) destClear = destClear.resolve(clear);
+          }
+          dest = destClear;
+        }
+ 
+        file.decrypt(this.revealPath.resolve(dest), this.km.getUnwrapEncKey());
+      }
+    } catch (Exception e) {
+      //e.printStackTrace();
+      throw new InternalException();
+    }
+    
+    return this.revealPath;
+  }
 
-    // }
+  private String getDirClearName(Path encName) {
+    for (VaultElement file : this.vaultFiles) {
+      if (file instanceof VaultDirectory) {
+        VaultDirectory dir = (VaultDirectory) file;
+        if (encName.toString().equals(dir.getEncName())) return dir.getFolderName();
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -355,10 +396,9 @@ public class Vault {
     try {
       // Read and decode token from the vault root
       Path confPath = VaultConfiguration.getPath(this.storagePath, this.vid);
-      FileChannel channel = FileChannel.open(confPath);
 
       // Check if configuration file is too large
-      if (channel.size() > MAX_TOKEN_SIZE) {
+      if (Files.size(confPath) > MAX_TOKEN_SIZE) {
         System.out.println("Vault configuration file is too large");
         throw new InvalidConfigurationException();
       }
@@ -595,7 +635,7 @@ public class Vault {
     vaultFilename = vaultFilename.substring(0, vaultFilename.length() - CONF_FILE_EXT.length());
 
     // Create vault with obtained parameters and add to the list view
-    return new Vault(UUID.fromString(vaultFilename), dir.getName(), dir.getParent());
+    return new Vault(UUID.fromString(vaultFilename), dir.getName(), Path.of(dir.getParent()));
   }
 
   public static boolean isConfFile(Path file) {
@@ -612,6 +652,14 @@ public class Vault {
     }
 
     return file.getFileName().toString().contains(CHKSUM_FILE_EXT);
+  }
+
+  public static boolean isDirFile(Path file) {
+    if (file == null) {
+      return false;
+    }
+
+    return file.getFileName().toString().contains(DIR_FILE_EXT);
   }
 
   // Overriding equals() to compare two Vault objects
@@ -636,8 +684,12 @@ public class Vault {
     this.name = name;
   }
 
-  public String getStoragePath() {
-    return this.storagePath.toString();
+  public Path getStoragePath() {
+    return this.storagePath;
+  }
+
+  public Path getRevealPath() {
+    return this.revealPath;
   }
 
   public VaultConfiguration getVaultConfiguration() {

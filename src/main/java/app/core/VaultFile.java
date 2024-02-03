@@ -24,37 +24,34 @@ public class VaultFile implements VaultElement {
     private SecretKey fileKey; // used to encrypt the content
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
+    private String encFilename; // updated by encryptHeader, it is the encrypted filename
 
     /**
      * Instantiate a file operation
+     *
      * @param folderPath base directory
-     * @param filename name of the file to open
-     * @throws IOException The path/filename is not a file or the file is not found
+     * @param filenamePath   name of the file to open
+     * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
-    public VaultFile(Path filename) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
-        if (filename == null) {
-            throw new IOException("path and filename cannot be null");
-        }
-        
-        Path normFilename = filename.normalize();
-        this.folderPath = normFilename.getParent(); //Path.of(folderPath).normalize();
-        this.filename = normFilename.getFileName().toString(); //Path.of(filename).normalize().getFileName().toString();
+    public VaultFile(Path filenamePath) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+        if (filenamePath == null) throw new IOException("filename cannot be null");
 
-        this.filenamePath = Path.of(this.folderPath.toString(), this.filename);
-        // if (!(new java.io.File(this.filenamePath.toString()).isFile())) {
-        //     throw new IOException("Path '" + this.filenamePath + "' is not a file or not found");
-        // }
+        this.filenamePath = filenamePath.normalize();
+        this.folderPath = this.filenamePath.getParent() != null ? this.filenamePath.getParent() : Path.of(".");
+        this.filename = this.filenamePath.getFileName().toString();
 
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
+        this.encFilename = "";
     }
 
     /**
      * Public method to encrypt the file
-     * @param encKey key to use to encrypt the header
+     *
+     * @param encKey        key to use to encrypt the header
      * @param srcPath destination folder path of the output file
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
@@ -68,14 +65,16 @@ public class VaultFile implements VaultElement {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (srcPath == null) throw new IOException("destination folder path cannot be null");
 
-        StringBuilder encFilename = new StringBuilder();
-        srcPath = srcPath.normalize(); // remove redundant elements
-        
-        byte[] encHeader = this.encryptHeader(srcPath, encKey, encFilename);
+        if (!(srcPath.toFile().isFile())) {
+            throw new IOException("Path '" + srcPath + "' is not a file or not found");
+        }
+
+        byte[] encHeader = this.encryptHeader(encKey);
         byte[] encContent = this.encryptContent(srcPath);
 
-        String encFilenameStr = Path.of(encFilename.toString()).normalize().getFileName().toString();        
-        OutputStream encryptedOutput = Files.newOutputStream(Path.of(folderPath.toString(), encFilenameStr)); // encrypted file output
+        String encFilenameStr = Path.of(this.encFilename.toString()).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
+        srcPath = srcPath.normalize(); // remove redundant elements
+        OutputStream encryptedOutput = Files.newOutputStream(Path.of(this.folderPath.toString(), encFilenameStr)); // encrypted file output
 
         encryptedOutput.write(encHeader);
         encryptedOutput.write(encContent);
@@ -87,8 +86,8 @@ public class VaultFile implements VaultElement {
 
     /**
      * function to encrypt the header (called in encrypt())
+     *
      * @param encKey key to use to encrypt the header
-     * @param encFilename instance of StringBuilder variable, at the end of this method it will contain the encrypted filename
      * @return encrypted bytes of full header
      * @throws NoSuchAlgorithmException
      * @throws InvalidKeyException
@@ -96,7 +95,7 @@ public class VaultFile implements VaultElement {
      * @throws BadPaddingException
      * @throws InvalidAlgorithmParameterException
      */
-    private byte[] encryptHeader(Path src, SecretKey encKey, StringBuilder encFilename) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+    private byte[] encryptHeader(SecretKey encKey) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         KeyGenerator keygen = KeyGenerator.getInstance(KEY_GEN_ALGO);
         keygen.init(KEY_SIZE_BITS, this.gen); // bits
         this.fileKey = keygen.generateKey(); // used to encrypt content later
@@ -113,7 +112,7 @@ public class VaultFile implements VaultElement {
         // first part is the fileKey, needed to decrypt content
         System.arraycopy(encodedKey, 0, toEnc, 0, KEY_SIZE);
 
-        byte[] filenameBytes = src.getFileName().toString().getBytes();
+        byte[] filenameBytes = this.filename.getBytes();
         if (filenameBytes.length > FILENAME_MAX_SIZE) {
             throw new IllegalBlockSizeException("filename should be <= " + FILENAME_MAX_SIZE + " bytes, instead it is" + filenameBytes.length + " bytes long");
         }
@@ -131,7 +130,7 @@ public class VaultFile implements VaultElement {
 
         String tempEncFilename = Base64.getUrlEncoder().encodeToString(encHeader);
         tempEncFilename = tempEncFilename.substring(0, Math.min(tempEncFilename.length(), 15));
-        encFilename.append(tempEncFilename); // param as reference
+        this.encFilename = tempEncFilename;
 
         return output;
     }
@@ -139,6 +138,7 @@ public class VaultFile implements VaultElement {
 
     /**
      * function to encrypt the content (called in encrypt())
+     *
      * @return encrypted bytes of the content
      * @throws IOException
      * @throws InvalidAlgorithmParameterException
@@ -146,10 +146,10 @@ public class VaultFile implements VaultElement {
      * @throws IllegalBlockSizeException
      * @throws BadPaddingException
      */
-    private byte[] encryptContent(Path src) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    private byte[] encryptContent(Path srcPath) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         byte[] iv = new byte[IVLEN];
 
-        InputStream is = Files.newInputStream(src); // input file stream
+        InputStream is = Files.newInputStream(srcPath); // input file stream
         ByteArrayOutputStream temp = new ByteArrayOutputStream(); // temporary output stream
 
         byte[] buffer = new byte[CHUNK_SIZE];
@@ -181,7 +181,8 @@ public class VaultFile implements VaultElement {
 
     /**
      * Public method to decrypt the file
-     * @param encKey key to use to decrypt the header
+     *
+     * @param encKey        key to use to decrypt the header
      * @param dstFolderPath destination folder path of the output file
      * @return the original plaintext filename
      * @throws InvalidAlgorithmParameterException
@@ -190,12 +191,12 @@ public class VaultFile implements VaultElement {
      * @throws InvalidKeyException
      * @throws IOException
      */
-    public String decrypt(SecretKey encKey, Path dstFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
+    public String decrypt(Path dstFolderPath, SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
         if (dstFolderPath == null) throw new IOException("destination folder path cannot be null");
 
         Path inputFilePath = this.filenamePath;
-        int dstFileSize = (int)Files.size(inputFilePath); // MAX 2.14 GB !!!
+        int dstFileSize = (int) Files.size(inputFilePath); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
         String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
@@ -214,7 +215,8 @@ public class VaultFile implements VaultElement {
 
     /**
      * function to decrypt the header (called in decrypt())
-     * @param encKey key to use to encrypt the header
+     *
+     * @param encKey    key to use to encrypt the header
      * @param inputData stream of the encrypted file
      * @param inputSize size of the encrypted file
      * @return the original plaintext filename
@@ -227,7 +229,7 @@ public class VaultFile implements VaultElement {
     private String decryptHeader(SecretKey encKey, InputStream inputData, int inputSize) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         int headerFullSize = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + TAG_LEN; // last TAG_LEN bytes are GCM authentication tag
         byte[] encrypted = new byte[headerFullSize];
-        //int _inputBytesRead = inputData.read(encrypted);
+        inputData.read(encrypted);
 
         // first part of the full header data is the IV
         System.arraycopy(encrypted, 0, this.headerIV, 0, IVLEN);
@@ -258,9 +260,10 @@ public class VaultFile implements VaultElement {
 
     /**
      * function to decrypt the content (called in decrypt())
+     *
      * @param outputFilePath path of the plaintext file to be written
-     * @param fileData stream of the encrypted file
-     * @param inputSize size of the encrypted file
+     * @param fileData       stream of the encrypted file
+     * @param inputSize      size of the encrypted file
      * @throws IOException
      * @throws InvalidAlgorithmParameterException
      * @throws InvalidKeyException
@@ -271,11 +274,11 @@ public class VaultFile implements VaultElement {
         final int HEADER_FULL_SIZE = IVLEN + KEY_SIZE + 1 + FILENAME_MAX_SIZE + TAG_LEN;
 
         byte[] contentData = new byte[inputSize - HEADER_FULL_SIZE];
-        //int _fileBytesRead = fileData.read(contentData);
+        fileData.read(contentData);
 
         byte[] iv = new byte[IVLEN];
         ByteArrayInputStream is = new ByteArrayInputStream(contentData); // input file stream to read chunks
-        OutputStream outputFile = Files.newOutputStream(outputFilePath);
+        OutputStream outputFile = Files.newOutputStream(outputFilePath); // TODO Handle file already exist
 
         // chunk: first part is IV, then the actual content plus the TAG_LEN bytes GCM authentication tag
         byte[] buffer = new byte[IVLEN + CHUNK_SIZE + TAG_LEN];
@@ -301,6 +304,11 @@ public class VaultFile implements VaultElement {
 
         is.close();
         outputFile.close();
+    }
+
+    @Override
+    public Path getRelativePath(Path vaultPath) {
+        return this.filenamePath;
     }
 
 }

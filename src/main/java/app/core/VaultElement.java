@@ -12,5 +12,6 @@ import javax.crypto.SecretKey;
 
 public interface VaultElement {
   public String encrypt(Path srcPath, SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException;
-  public String decrypt(SecretKey encKey, Path dstFolderPath) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException;
+  public String decrypt(Path dstPath, SecretKey encKey) throws InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, IOException;
+  public Path getRelativePath(Path vaultPath);
 }

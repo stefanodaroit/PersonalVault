@@ -284,7 +284,7 @@ public class PersonalVault extends Application {
     }    
     StringJoiner paths = new StringJoiner("\n");
     for(Vault v : vaultList) {
-      paths.add(v.getStoragePath());
+      paths.add(v.getStoragePath().toString());
     }
     try {
       Files.write(CONF, paths.toString().getBytes());

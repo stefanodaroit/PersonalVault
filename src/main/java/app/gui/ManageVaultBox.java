@@ -4,7 +4,6 @@ import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Optional;
 
 import app.core.Vault;
@@ -54,7 +53,7 @@ public class ManageVaultBox extends VBox {
     this.vault = vault;
     this.selectedItem = null;
 
-    Path vaultPath = Paths.get(vault.getStoragePath());
+    Path vaultPath = vault.getStoragePath();
     this.treeView = new FileSystemTreeView(vaultPath);
     this.treeView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
       this.selectedItem = (TreeItem<String>) newValue;
@@ -85,6 +84,7 @@ public class ManageVaultBox extends VBox {
       centerBox.setAlignment(Pos.CENTER);
       centerBox.setPadding(new Insets(PADDING));
       
+      // TODO Add directorychooser for reveal path
       
       // Bottom box with buttons
       final HBox bottomBox = new HBox(SPACING);
@@ -97,7 +97,7 @@ public class ManageVaultBox extends VBox {
       final Button confirmBtn = new Button("Unlock");
       confirmBtn.setOnAction(e -> {
         try {
-          this.vault.unlock(pswFld.getText());
+          this.vault.unlock(pswFld.getText(), this.vault.getStoragePath().resolve("..")); // Get Path from directory chooser
           unlockStage.close();
           this.getChildren().clear();
           setUnlockedPane();
@@ -138,7 +138,7 @@ public class ManageVaultBox extends VBox {
     final Button revealBtn = new Button("Reveal Content");
     revealBtn.setOnAction(e -> {
       try {
-        Desktop.getDesktop().browseFileDirectory(new File(this.vault.getStoragePath()));
+        Desktop.getDesktop().browseFileDirectory(this.vault.getRevealPath().toFile());
       } catch (RuntimeException exc) {
         System.err.println("Unsupported feature");
         new Alert(AlertType.WARNING, "Cannot reveal content: feature not supported on this platform", ButtonType.OK).show();

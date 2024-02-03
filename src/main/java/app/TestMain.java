@@ -1,21 +1,9 @@
 package app;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Comparator;
 import java.util.UUID;
 
 import app.core.Vault;
-import app.core.VaultConfiguration;
-
-import app.core.Vault;
-
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import java.nio.file.Path;
 
 public class TestMain {
   private static final String PSW = "Password1234!";
@@ -24,9 +12,10 @@ public class TestMain {
   public static void main(String[] args) {
 
     try {
-      Vault v = new Vault(UUID.fromString("0700114b-58c7-4a99-95a7-6b714a2a4dfd"), NAME, PATH);
-      v.unlock(PSW);
-      v.addDirectory(Path.of(PATH, "dir"));
+      Vault v = new Vault(UUID.fromString("0700114b-58c7-4a99-95a7-6b714a2a4dfd"), NAME, Path.of(PATH));
+      v.unlock(PSW, Path.of("/mnt/c/Users/stefa/Desktop/unlk"));
+      //v.addFile(Path.of(PATH, "Security Testing.docx"));
+      //v.addDirectory(Path.of(PATH, "dir"));
     } catch (Exception e) {
       e.printStackTrace();
     }
