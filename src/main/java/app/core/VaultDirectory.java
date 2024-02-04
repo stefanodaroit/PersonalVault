@@ -24,15 +24,16 @@ public class VaultDirectory implements VaultItem{
     
     private Path folderPath; // "/dir"
     private Path folderNamePath; // "/dir/dir2"
-    private Path encDirFile;
-    
+    private Path encDirFile; // file ".dir" that stores the metadata of the parent folder
+
     private String encName; // updated by encryptHeader, it is the encrypted directory name
     private String folderName; // "dir2"
 
     /**
      * Instantiate a directory operation
      *
-     * @param folderPath base directory
+     * @param folderNamePath base directory
+     * @param encrypted if true instance of Self decryption, if false instance of Self encryption
      * @throws IOException              The path is not defined
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
@@ -58,24 +59,23 @@ public class VaultDirectory implements VaultItem{
     /**
      * Public method to encrypt the directory name
      *
-     * @param encKey            key used to encrypt the header
-     * @param srcPath destination folder path of output
+     * @param srcPath
+     * @param encKey    key used to encrypt the header
      * @return the encrypted directory name
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
      * @throws InvalidKeyException                encryption key cannot be null
      * @throws IllegalBlockSizeException
      * @throws BadPaddingException
-     * @throws IOException                        destination folder path cannot be null or other IO exceptions
+     * @throws IOException
      */
-    public String encrypt(Path srcPath, SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
+    public String encrypt(Path srcPath, SecretKey encKey) throws InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
-        if (srcPath == null) throw new IOException("destination folder path cannot be null");
+//        if (srcPath == null) throw new IOException("destination folder path cannot be null");
 
         byte[] encHeader = this.encryptHeader(encKey);
 
         String encDestinationStr = this.encName;
-        srcPath = srcPath.normalize(); // remove redundant elements
         Path dstFolderPath = this.folderPath.resolve(encDestinationStr);
         Files.createDirectory(dstFolderPath);
 
@@ -133,8 +133,8 @@ public class VaultDirectory implements VaultItem{
     /**
      * Public method to decrypt the file
      *
-     * @param encKey            key used to decrypt the header
      * @param dstBaseFolderPath destination folder path of output
+     * @param encKey            key used to decrypt the header
      * @return the decrypted directory name
      * @throws InvalidAlgorithmParameterException
      * @throws IllegalBlockSizeException

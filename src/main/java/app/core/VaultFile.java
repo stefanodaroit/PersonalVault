@@ -18,10 +18,10 @@ import static app.core.Constants.*;
 public class VaultFile implements VaultItem {
     
     private final SecureRandom gen; // random bytes generator
-    private SecretKey fileKey; // used to encrypt the content
-    private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
-    
+    private byte[] headerIV; // Initialization Vector of the header
+    private SecretKey fileKey; // used to encrypt the content
+
     private Path folderPath; // "./dir/dir2/"
     private Path filenamePath; // "./dir/dir2/file.txt"
     private String filename; // "file.txt"
@@ -31,6 +31,7 @@ public class VaultFile implements VaultItem {
      * Instantiate a file operation
      *
      * @param filenamePath   name of the file to open
+     * @param encrypted if true instance of Self decryption, if false instance of Self encryption
      * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
@@ -46,8 +47,7 @@ public class VaultFile implements VaultItem {
         } else {
             this.filename = this.filenamePath.getFileName().toString();
         } 
-        
-       
+
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
@@ -56,8 +56,8 @@ public class VaultFile implements VaultItem {
     /**
      * Public method to encrypt the file
      *
+     * @param srcPath input file path
      * @param encKey        key to use to encrypt the header
-     * @param srcPath destination folder path of the output file
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
@@ -68,17 +68,17 @@ public class VaultFile implements VaultItem {
      */
     public String encrypt(Path srcPath, SecretKey encKey) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException {
         if (encKey == null) throw new InvalidKeyException("encryption key cannot be null");
-        if (srcPath == null) throw new IOException("destination folder path cannot be null");
+        if (srcPath == null) throw new IOException("input file path cannot be null");
 
         if (!(srcPath.toFile().isFile())) {
             throw new IOException("Path '" + srcPath + "' is not a file or not found");
         }
+        srcPath = srcPath.normalize(); // remove redundant elements
 
         byte[] encHeader = this.encryptHeader(encKey);
         byte[] encContent = this.encryptContent(srcPath);
 
-        String encFilenameStr = Path.of(this.encFilename.toString()).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
-        srcPath = srcPath.normalize(); // remove redundant elements
+        String encFilenameStr = Path.of(this.encFilename).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(this.folderPath.toString(), encFilenameStr)); // encrypted file output
 
         this.filenamePath = this.filenamePath.getParent().resolve(encFilenameStr);
@@ -189,8 +189,8 @@ public class VaultFile implements VaultItem {
     /**
      * Public method to decrypt the file
      *
-     * @param encKey        key to use to decrypt the header
      * @param dstFolderPath destination folder path of the output file
+     * @param encKey        key to use to decrypt the header
      * @return the original plaintext filename
      * @throws InvalidAlgorithmParameterException
      * @throws IllegalBlockSizeException
