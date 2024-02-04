@@ -215,7 +215,6 @@ public class Vault {
         Path file = absDstPath.getParent().resolve(encName);
         if (Files.exists(file)) { Files.delete(file); }
       }
-      e.printStackTrace();
       throw new InternalException();
     }
   }
@@ -369,7 +368,6 @@ public class Vault {
         file.decrypt(this.revealPath.resolve(dest), this.km.getUnwrapEncKey());
       }
     } catch (Exception e) {
-      e.printStackTrace();
       throw new InternalException();
     }
 
