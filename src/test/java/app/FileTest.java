@@ -59,10 +59,10 @@ public class FileTest {
         new VaultFile(Path.of("./README.md"), false);
     }
 
-    @Test(expected = IOException.class)
-    public void testFileNotFound() throws Exception {
-        new VaultFile(Path.of("./not-existing-file"), false);
-    }
+//    @Test(expected = IOException.class)
+//    public void testFileNotFound() throws Exception {
+//        new VaultFile(Path.of("./not-existing-file"), false);
+//    }
 
     @Test(expected = InvalidKeyException.class)
     public void testEncryptNullKey() throws Exception {

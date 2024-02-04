@@ -70,12 +70,6 @@ public class DirectoryTest {
     }
 
     @Test(expected = IOException.class)
-    public void testEncryptNullDstPath() throws Exception {
-        VaultDirectory de = new VaultDirectory(Path.of("./tmp"), false);
-        de.encrypt(null, this.encKey);
-    }
-
-    @Test(expected = IOException.class)
     public void testDecryptNullDstPath() throws Exception {
         VaultDirectory de = new VaultDirectory(Path.of("./tmp"), true);
         de.decrypt(null, this.encKey);

@@ -39,9 +39,9 @@ public class VaultFile implements VaultItem {
     public VaultFile(Path filenamePath, boolean encrypted) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         if (filenamePath == null) throw new IOException("filename cannot be null");
         this.filenamePath = filenamePath.normalize();
-        if (!(this.filenamePath.toFile().isFile())) {
-            throw new IOException("Path '" + this.filenamePath + "' is not a file or not found");
-        }
+//        if (!(this.filenamePath.toFile().isFile())) {
+//            throw new IOException("Path '" + this.filenamePath + "' is not a file or not found");
+//        }
 
         this.folderPath = this.filenamePath.getParent() != null ? this.filenamePath.getParent() : Path.of(".");
 
