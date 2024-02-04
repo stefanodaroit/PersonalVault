@@ -16,7 +16,7 @@ import java.util.Base64;
 import static app.core.Constants.*;
 
 public class VaultFile implements VaultItem {
-    
+
     private final SecureRandom gen; // random bytes generator
     private final Cipher c;
     private byte[] headerIV; // Initialization Vector of the header
@@ -26,27 +26,30 @@ public class VaultFile implements VaultItem {
     private Path filenamePath; // "./dir/dir2/file.txt"
     private String filename; // "file.txt"
     private String encFilename; // updated by encryptHeader, it is the encrypted filename
-    
+
     /**
      * Instantiate a file operation
      *
-     * @param filenamePath   name of the file to open
-     * @param encrypted if true instance of Self decryption, if false instance of Self encryption
+     * @param filenamePath name of the file to open
+     * @param encrypted    if true instance of Self decryption, if false instance of Self encryption
      * @throws IOException              The path/filename is not a file or the file is not found
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
     public VaultFile(Path filenamePath, boolean encrypted) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         if (filenamePath == null) throw new IOException("filename cannot be null");
-
         this.filenamePath = filenamePath.normalize();
+        if (!(this.filenamePath.toFile().isFile())) {
+            throw new IOException("Path '" + this.filenamePath + "' is not a file or not found");
+        }
+
         this.folderPath = this.filenamePath.getParent() != null ? this.filenamePath.getParent() : Path.of(".");
-        
+
         if (encrypted) {
             this.encFilename = this.filenamePath.getFileName().toString();
         } else {
             this.filename = this.filenamePath.getFileName().toString();
-        } 
+        }
 
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
@@ -56,8 +59,8 @@ public class VaultFile implements VaultItem {
     /**
      * Public method to encrypt the file
      *
-     * @param srcPath input file path
-     * @param encKey        key to use to encrypt the header
+     * @param srcPath path of the file to open
+     * @param encKey  key to use to encrypt the header
      * @return the filename of the encrypted file
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException

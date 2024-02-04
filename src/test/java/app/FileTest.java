@@ -8,7 +8,6 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
@@ -18,30 +17,36 @@ import java.util.Random;
 public class FileTest {
 
     private final Random r = new Random();
-    private final Path localPath = Path.of(".");
-    private final Path dstTestPath = Path.of("./test");
+    private static final Path localPath = Path.of(".");
+    private static final Path dstTestPath = Path.of("./test");
+    private static final Path dstOutputPath = Path.of("./output");
+    private final Path notExistingPath = Path.of("not-existing");
+    private final Path notExistingEncPath = Path.of("not-existing-enc");
 
     // https://junit.org/junit4/javadoc/latest/org/junit/BeforeClass.html
-    @Before
-    public void createTestFolder() throws IOException {
+    @BeforeClass
+    public static void createTestFolder() throws IOException {
         Files.createDirectory(dstTestPath);
+        Files.createDirectory(dstOutputPath);
     }
 
     // https://junit.org/junit4/javadoc/latest/org/junit/AfterClass.html
-    @After
-    public void deleteTestFolder() throws IOException {
+    @AfterClass
+    public static void deleteTestFolder() throws IOException {
         Files.delete(dstTestPath);
+        Files.delete(dstOutputPath);
     }
 
-    private String createRandomFile() throws IOException {
+    private Path createRandomFile() throws IOException {
         byte[] fileOutput = new byte[this.r.nextInt(1000000)];
         this.r.nextBytes(fileOutput);
 
         String filename = Base64.getUrlEncoder().encodeToString(fileOutput);
         filename = filename.substring(0, Math.min(this.r.nextInt(10, 50), filename.length()));
 
-        Files.write(Path.of(filename), fileOutput);
-        return filename;
+        Path dstFilePath = dstTestPath.resolve(filename);
+        Files.write(dstFilePath, fileOutput);
+        return dstFilePath;
     }
 
     @Test(expected = IOException.class)
@@ -49,104 +54,104 @@ public class FileTest {
         new VaultFile(null, false);
     }
 
-    // @Test()
-    // public void testFileFound() throws Exception {
-    //     VaultFile f = new VaultFile(".", "README.md");
-    // }
+    @Test()
+    public void testFileFound() throws Exception {
+        new VaultFile(Path.of("./README.md"), false);
+    }
 
-    // @Test(expected = IOException.class)
-    // public void testFileNotFound() throws Exception {
-    //     VaultFile f = new VaultFile(".", "not-existing-file");
-    // }
+    @Test(expected = IOException.class)
+    public void testFileNotFound() throws Exception {
+        new VaultFile(Path.of("./not-existing-file"), false);
+    }
 
     @Test(expected = InvalidKeyException.class)
     public void testEncryptNullKey() throws Exception {
-        String filename = "not-existing";
+        Path filePath = notExistingPath;
         try {
-            filename = createRandomFile();
+            filePath = createRandomFile();
 
-            VaultFile fe = new VaultFile(Path.of(".", filename), false);
-            fe.encrypt(localPath, null);
+            VaultFile fe = new VaultFile(filePath, false);
+            fe.encrypt(dstTestPath, null);
         } finally {
-            Files.delete(Path.of(".", filename));
+            Files.delete(filePath);
         }
     }
 
     @Test(expected = InvalidKeyException.class)
     public void testDecryptNullKey() throws Exception {
-        String filename = "not-existing";
+        Path filePath = notExistingPath;
         try {
-            filename = createRandomFile();
+            filePath = createRandomFile();
 
-            VaultFile fe = new VaultFile(Path.of(".", filename), true);
+            VaultFile fe = new VaultFile(filePath, true);
             fe.decrypt(dstTestPath, null);
         } finally {
-            Files.delete(Path.of(".", filename));
+            Files.delete(filePath);
         }
     }
 
-    @Test(expected = NoSuchFileException.class)
+    @Test(expected = AEADBadTagException.class)
     public void testFileDifferentKey() throws Exception {
-        String filename = "not-existing";
-        String encFilename = "not-existing-enc";
+        Path filePath = notExistingPath;
+        Path encFilename = notExistingEncPath;
         try {
-            filename = createRandomFile();
+            filePath = createRandomFile();
 
             KeyGenerator keygen = KeyGenerator.getInstance("AES");
             keygen.init(256); // bits
             SecretKey encKey1 = keygen.generateKey();
 
-            VaultFile fe = new VaultFile(Path.of(".", filename), false);
-            encFilename = fe.encrypt(Path.of(".", filename), encKey1);
+            VaultFile fe = new VaultFile(filePath, false);
+            encFilename = dstTestPath.resolve(fe.encrypt(filePath, encKey1));
 
             SecretKey encKey2 = keygen.generateKey();
-            VaultFile fd = new VaultFile(Path.of(localPath.toString(), encFilename), true);
-            fd.decrypt(dstTestPath, encKey2); // should not start creating the file
+            VaultFile fd = new VaultFile(encFilename, true);
+            fd.decrypt(dstOutputPath, encKey2); // should not start creating the file
         } finally {
-            Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(localPath.toString(), encFilename));
+            Files.delete(filePath);
+            Files.delete(encFilename);
         }
     }
 
-    /*@Test()
+    @Test()
     public void testFileEncryptDecrypt() throws Exception {
-        String filename = createRandomFile();
+        Path filePath = createRandomFile();
 
         KeyGenerator keygen = KeyGenerator.getInstance("AES");
         keygen.init(256); // bits
         SecretKey encKey = keygen.generateKey();
 
-        VaultFile fe = new VaultFile(Path.of(".", filename), false);
-        String encFilename = fe.encrypt(localPath.resolve(filename), encKey);
-        byte[] f1 = Files.readAllBytes(Path.of(filename));
+        byte[] f1 = Files.readAllBytes(filePath);
+        VaultFile fe = new VaultFile(filePath, false);
+        Path encFilename = dstTestPath.resolve(fe.encrypt(filePath, encKey));
 
-        VaultFile fd = new VaultFile(localPath.resolve(encFilename), true);
-        String decFilename = fd.decrypt(dstTestPath, encKey);
-        byte[] f2 = Files.readAllBytes(Path.of(dstTestPath.toString(), decFilename));
+        VaultFile fd = new VaultFile(encFilename, true);
+        Path decFilename = dstOutputPath.resolve(fd.decrypt(dstOutputPath, encKey));
+        byte[] f2 = Files.readAllBytes(decFilename);
 
-        Files.delete(Path.of(".", filename));
-        Files.delete(Path.of(localPath.toString(), encFilename));
-        Files.delete(Path.of(dstTestPath.toString(), decFilename));
+        Files.delete(filePath);
+        Files.delete(encFilename);
+        Files.delete(decFilename);
 
         Assert.assertArrayEquals(f1, f2);
-    }*/
+    }
 
-    @Test(expected = NoSuchFileException.class)
+    @Test(expected = AEADBadTagException.class)
     public void testFileTamperedHeader() throws Exception {
-        String filename = "not-existing";
-        String encFilename = "not-existing-enc";
+        Path filePath = notExistingPath;
+        Path encFilePath = notExistingEncPath;
         try {
-            filename = createRandomFile();
+            filePath = createRandomFile();
 
             KeyGenerator keygen = KeyGenerator.getInstance("AES");
             keygen.init(256); // bits
             SecretKey encKey = keygen.generateKey();
 
-            VaultFile fe = new VaultFile(Path.of(".", filename), false);
-            encFilename = fe.encrypt(Path.of(".", filename), encKey);
+            VaultFile fe = new VaultFile(filePath, false);
+            encFilePath = dstTestPath.resolve(fe.encrypt(filePath, encKey));
 
             // overwrite encrypted file header byte
-            byte[] fb = Files.readAllBytes(Path.of(localPath.toString(), encFilename));
+            byte[] fb = Files.readAllBytes(encFilePath);
 
             // generate one different byte at an arbitrary position
             byte x;
@@ -154,66 +159,84 @@ public class FileTest {
                 x = (byte) this.r.nextInt();
             } while (x == fb[10]);
             fb[10] = x;
-            Files.write(Path.of(localPath.toString(), encFilename), fb);
+            Files.write(encFilePath, fb);
 
-            VaultFile fd = new VaultFile(localPath.resolve(encFilename), true);
+            VaultFile fd = new VaultFile(encFilePath, true);
             // the header does not match, the file is not created
-            fd.decrypt(dstTestPath, encKey);
+            fd.decrypt(dstOutputPath, encKey);
         } finally {
-            Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(localPath.toString(), encFilename));
+            Files.delete(filePath);
+            Files.delete(encFilePath);
         }
     }
 
-    @Test(expected = NoSuchFileException.class)
+    @Test(expected = AEADBadTagException.class)
     public void testFileTamperedContent() throws Exception {
-        String filename = "not-existing";
-        String encFilename = "not-existing-enc";
+        Path filePath = notExistingPath;
+        Path encFilePath = notExistingEncPath;
         try {
-            filename = createRandomFile();
+            filePath = createRandomFile();
 
             KeyGenerator keygen = KeyGenerator.getInstance("AES");
             keygen.init(256); // bits
             SecretKey encKey = keygen.generateKey();
 
-            VaultFile fe = new VaultFile(Path.of(".", filename), false);
-            encFilename = fe.encrypt(Path.of(".", filename), encKey);
+            VaultFile fe = new VaultFile(filePath, false);
+            encFilePath = dstTestPath.resolve(fe.encrypt(filePath, encKey));
 
-            Files.write(Path.of(encFilename), new byte[]{(byte) this.r.nextInt()}, StandardOpenOption.APPEND);
+            Files.write(encFilePath, new byte[]{(byte) this.r.nextInt()}, StandardOpenOption.APPEND);
 
-            VaultFile fd = new VaultFile(localPath.resolve(encFilename), true);
+            VaultFile fd = new VaultFile(encFilePath, true);
             // file is created because header bytes match,
             // but the content bytes does not match, so throw an exception. The under-the-hood file is deleted
-            fd.decrypt(dstTestPath, encKey);
+            fd.decrypt(dstOutputPath, encKey);
         } finally {
-            Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(localPath.toString(), encFilename));
+            Files.delete(filePath);
+            Files.delete(encFilePath);
         }
     }
 
-    /*@Test()
+    @Test()
     public void testEqualFilenames() throws Exception {
-        String filename = "not-existing";
-        String encFilename = "not-existing-enc";
-        String decFilename = "not-existing-dec";
-        try {
-            filename = createRandomFile();
+        Path filePath = createRandomFile();
 
-            KeyGenerator keygen = KeyGenerator.getInstance("AES");
-            keygen.init(256); // bits
-            SecretKey encKey = keygen.generateKey();
+        KeyGenerator keygen = KeyGenerator.getInstance("AES");
+        keygen.init(256); // bits
+        SecretKey encKey = keygen.generateKey();
 
-            VaultFile fe = new VaultFile(Path.of(".", filename), false);
-            encFilename = fe.encrypt(Path.of(".", filename), encKey);
+        VaultFile fe = new VaultFile(filePath, false);
+        Path encFilename = dstTestPath.resolve(fe.encrypt(filePath, encKey));
 
-            VaultFile fd = new VaultFile(localPath.resolve(encFilename), true);
-            decFilename = fd.decrypt(dstTestPath, encKey);
-        } finally {
-            Files.delete(Path.of(".", filename));
-            Files.delete(Path.of(localPath.toString(), encFilename));
-            Files.delete(Path.of(dstTestPath.toString(), decFilename));
-        }
+        VaultFile fd = new VaultFile(encFilename, true);
+        Path decFilename = dstOutputPath.resolve(fd.decrypt(dstOutputPath, encKey));
 
-        Assert.assertEquals(filename, decFilename);
-    }*/
+        Files.delete(filePath);
+        Files.delete(encFilename);
+        Files.delete(decFilename);
+
+        Assert.assertEquals(filePath.getFileName().toString(), decFilename.getFileName().toString());
+    }
+
+    @Test()
+    public void testIndexFilenames() throws Exception {
+        Path filePath = createRandomFile();
+
+        KeyGenerator keygen = KeyGenerator.getInstance("AES");
+        keygen.init(256); // bits
+        SecretKey encKey = keygen.generateKey();
+
+        VaultFile fe = new VaultFile(filePath, false);
+        Path encFilename = dstTestPath.resolve(fe.encrypt(filePath, encKey));
+
+        VaultFile fd = new VaultFile(encFilename, true);
+        Path decFilename = dstTestPath.resolve(fd.decrypt(dstTestPath, encKey));
+
+        Files.delete(filePath);
+        Files.delete(encFilename);
+        Files.delete(decFilename);
+
+        // same source and destination folder, the original filename already exists,
+        // so check if the code correctly prepends an index
+        Assert.assertEquals("0-" + filePath.getFileName().toString(), decFilename.getFileName().toString());
+    }
 }
