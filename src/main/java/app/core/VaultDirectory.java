@@ -16,12 +16,12 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class VaultDirectory implements VaultItem{
-    
+public class VaultDirectory implements VaultItem {
+
     private final SecureRandom gen; // random bytes generator
     private final Cipher c;
     private byte[] headerIV; // Initialization Vector of the header
-    
+
     private Path folderPath; // "/dir"
     private Path folderNamePath; // "/dir/dir2"
     private Path encDirFile; // file ".dir" that stores the metadata of the parent folder
@@ -33,23 +33,23 @@ public class VaultDirectory implements VaultItem{
      * Instantiate a directory operation
      *
      * @param folderNamePath base directory
-     * @param encrypted if true instance of Self decryption, if false instance of Self encryption
+     * @param encrypted      if true instance of Self decryption, if false instance of Self encryption
      * @throws IOException              The path is not defined
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
     public VaultDirectory(Path folderNamePath, boolean encrypted) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         if (folderNamePath == null) throw new IOException("path cannot be null");
-        
+
         this.folderNamePath = folderNamePath.normalize();
-        this.folderPath =  this.folderNamePath.getParent() != null ? this.folderNamePath.getParent() : Path.of(".");;
-        
+        this.folderPath = this.folderNamePath.getParent() != null ? this.folderNamePath.getParent() : Path.of(".");
+
         if (encrypted) {
             this.encName = this.folderNamePath.getFileName().toString();
             this.encDirFile = this.folderNamePath.resolve(this.encName + ".dir");
         } else {
             this.folderName = this.folderNamePath.getFileName().toString();
-        }        
+        }
 
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
@@ -60,7 +60,7 @@ public class VaultDirectory implements VaultItem{
      * Public method to encrypt the directory name
      *
      * @param srcPath
-     * @param encKey    key used to encrypt the header
+     * @param encKey  key used to encrypt the header
      * @return the encrypted directory name
      * @throws NoSuchAlgorithmException
      * @throws InvalidAlgorithmParameterException
@@ -81,7 +81,7 @@ public class VaultDirectory implements VaultItem{
 
         this.folderNamePath = this.folderNamePath.getParent().resolve(encDestinationStr);
         this.encDirFile = Path.of(dstFolderPath.toString(), encDestinationStr + ".dir");
-        
+
         OutputStream encryptedOutput = Files.newOutputStream(this.encDirFile); // encrypted file output
         encryptedOutput.write(encHeader);
         encryptedOutput.close();
@@ -215,7 +215,7 @@ public class VaultDirectory implements VaultItem{
         String folderStr = new String(folderName, StandardCharsets.UTF_8);
         return folderStr;
     }
-    
+
     @Override
     public Path getRelPath(Path vaultPath) {
         return this.folderNamePath.subpath(vaultPath.normalize().getNameCount(), this.folderNamePath.getNameCount());
@@ -235,7 +235,7 @@ public class VaultDirectory implements VaultItem{
     public String getEncName() {
         return this.encName;
     }
-    
+
     public Path getEncDirFile() {
         return this.encDirFile;
     }
