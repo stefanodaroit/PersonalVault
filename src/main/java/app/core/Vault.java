@@ -9,6 +9,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
@@ -34,7 +35,7 @@ public class Vault {
 
   private KeyManager km;
   private VaultConfiguration conf;
-  private List<VaultElement> vaultFiles;
+  private List<VaultItem> vaultFiles;
   
   /**
    * Create a new vault in "path" using "password" for keys derivation
@@ -119,7 +120,7 @@ public class Vault {
     try {
       for (Path file : Files.walk(this.storagePath).toList()) {
         if (!(isConfFile(file) || isMacFile(file) || isDirFile(file) || file.equals(this.storagePath))) {
-          VaultElement vaultFile = Files.isDirectory(file) ? new VaultDirectory(file, true) : new VaultFile(file);
+          VaultItem vaultFile = Files.isDirectory(file) ? new VaultDirectory(file, true) : new VaultFile(file, true);
           vaultFiles.add(vaultFile);
         }
       }
@@ -153,7 +154,7 @@ public class Vault {
         Path destEnc = Path.of("");
         // For each directory get the encrypted name and compose the path
         for (int i = 0; i < dest.getNameCount() - 1; i++) {
-          String enc = getDirEncName(dest.getName(i));
+          String enc = getItemEncName(destEnc, dest.getName(i));
           if (enc != null) destEnc = destEnc.resolve(enc);
         }
         dest = destEnc.resolve(dest.getFileName());
@@ -200,11 +201,11 @@ public class Vault {
     
     // Encrypt file and add to the vault
     try {
-      VaultElement file = null;
+      VaultItem file = null;
       if (Files.isDirectory(absSrcPath)) {
         file = new VaultDirectory(absDstPath, false);
       } else {
-        file = new VaultFile(absDstPath);
+        file = new VaultFile(absDstPath, false);
       }
       encName = file.encrypt(absSrcPath, this.km.getUnwrapEncKey());
       computeTreeChecksum(relDstPath.getParent(), encName);
@@ -217,6 +218,84 @@ public class Vault {
       e.printStackTrace();
       throw new InternalException();
     }
+  }
+
+  /**
+   * Method to remove a directory/file from the vault given the clear relPath
+   * 
+   * @param relPath The clear relative path
+   * @throws IOException
+   * @throws InternalException
+   * @throws VaultLockedException
+   */
+  public void remove(Path relPath) throws IOException, InternalException, VaultLockedException {    
+    if (this.locked) {
+      throw new VaultLockedException();
+    }
+    
+    // Construct encrypted path
+    Path encPath = Path.of("");
+    for (int i = 0; i < relPath.getNameCount(); i++) {
+      String enc = getItemEncName(encPath, relPath.getName(i));
+      if (enc != null) encPath = encPath.resolve(enc);
+    }
+
+    Files.walk(this.storagePath.resolve(encPath))
+    .sorted(Comparator.reverseOrder())
+    .forEach(path -> { 
+      try {
+        Files.deleteIfExists(path);
+        if (!isDirFile(path)) {
+          Path relPathToDelete = path.subpath(this.storagePath.getNameCount(), path.getNameCount());
+          this.vaultFiles.remove(getVaultFile(relPathToDelete));
+        }
+      } catch (IOException e) {
+        System.err.println("Error while deleting " + path);
+      }
+    });
+
+    Files.deleteIfExists(this.treeChecksumFile);
+
+    for (VaultItem item : this.vaultFiles) {
+      computeTreeChecksum(item.getRelPath(this.storagePath).getParent(), item.getEncName().toString());
+    }
+  }
+
+  /**
+   * Method to clear the vault content
+   * @throws IOException 
+   * @throws VaultLockedException 
+   */
+  public void clear() throws IOException, VaultLockedException {
+    if (this.locked) {
+      throw new VaultLockedException();
+    }
+    
+    // Delete all files
+    Files.walk(this.storagePath)
+    .sorted(Comparator.reverseOrder())
+    .forEach(path -> {
+      if (!(isConfFile(path) || path.equals(this.storagePath))) {
+        try {
+          Files.deleteIfExists(path);
+        } catch (IOException e) {
+          System.err.println("Error while deleting " + path);
+        }
+      }
+    });
+
+    this.vaultFiles.clear();
+  }
+
+  /**
+   * Method to delete the vault
+   * @throws IOException
+   * @throws VaultLockedException
+   */
+  public void delete() throws IOException, VaultLockedException {
+    this.clear();
+    Files.deleteIfExists(VaultConfiguration.getPath(this.storagePath, this.vid));
+    Files.deleteIfExists(this.storagePath);
   }
 
   /**
@@ -270,9 +349,9 @@ public class Vault {
 
     try {
       Files.createDirectory(this.revealPath);
-      for (VaultElement file : this.vaultFiles) {
+      for (VaultItem file : this.vaultFiles) {
         // Get relative path within the vault
-        Path dest = file.getRelativePath(this.storagePath);
+        Path dest = file.getRelPath(this.storagePath);
         if (dest.getNameCount() == 1) {
           dest = Path.of(".");
         }         
@@ -281,7 +360,7 @@ public class Vault {
           Path destClear = Path.of("");
           // For each directory get the encrypted name and compose the path
           for (int i = 0; i < dest.getNameCount() - 1; i++) {
-            String clear = getDirClearName(dest.getName(i));
+            String clear = getItemClearName(dest.getName(i));
             if (clear != null) destClear = destClear.resolve(clear);
           }
           dest = destClear;
@@ -663,12 +742,13 @@ public class Vault {
    * 
    * @return the vault item
    */
-  private VaultElement getVaultFile(Path toFind) {
+  public VaultItem getVaultFile(Path toFind) {
     if (toFind == null) { return null; }
     
-    VaultElement find = null;
-    for (VaultElement file : this.vaultFiles) {
-      if (file.getRelativePath(this.storagePath).equals(toFind)) { return file; }
+    VaultItem find = null;
+    for (VaultItem file : this.vaultFiles) {
+      //System.out.println(file.getRelPath(this.storagePath) + "==" + toFind);
+      if (file.getRelPath(this.storagePath).equals(toFind)) { return file; }
     }
     
     return find;
@@ -679,11 +759,11 @@ public class Vault {
    * @param encName The encrypted name
    * @return The clear name
    */
-  private String getDirClearName(Path encName) {
-    for (VaultElement file : this.vaultFiles) {
+  private String getItemClearName(Path encName) {
+    for (VaultItem file : this.vaultFiles) {
       if (file instanceof VaultDirectory) {
         VaultDirectory dir = (VaultDirectory) file;
-        if (encName.toString().equals(dir.getEncName())) return dir.getFolderName();
+        if (encName.toString().equals(dir.getEncName())) return dir.getName();
       }
     }
 
@@ -695,11 +775,11 @@ public class Vault {
    * @param clearName The clear name
    * @return The encrypted name
    */
-  private String getDirEncName(Path clearName) {
-    for (VaultElement file : this.vaultFiles) {
-      if (file instanceof VaultDirectory) {
-        VaultDirectory dir = (VaultDirectory) file;
-        if (clearName.toString().equals(dir.getFolderName())) return dir.getEncName();
+  private String getItemEncName(Path parent, Path clearName) {
+    for (VaultItem file : this.vaultFiles) {
+      if (parent != null && parent.toString().length() != 0 && !parent.equals(file.getRelPath(this.storagePath).getParent())) { continue; }
+      if (clearName.toString().equals(file.getName())) {
+        return file.getEncName();
       }
     }
 
@@ -752,6 +832,10 @@ public class Vault {
 
   public VaultConfiguration getVaultConfiguration() {
     return this.conf;
+  }
+
+  public List<VaultItem> getVaultItems() {
+    return this.vaultFiles;
   }
 
   public boolean isLocked() {

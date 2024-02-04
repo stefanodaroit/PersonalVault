@@ -15,17 +15,18 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class VaultFile implements VaultElement {
-
-    private final Path folderPath; // "./dir/dir2/"
-    private final String filename; // "file.txt"
-    private final Path filenamePath; // "./dir/dir2/file.txt"
+public class VaultFile implements VaultItem {
+    
     private final SecureRandom gen; // random bytes generator
     private SecretKey fileKey; // used to encrypt the content
     private byte[] headerIV; // Initialization Vector of the header
     private final Cipher c;
+    
+    private Path folderPath; // "./dir/dir2/"
+    private Path filenamePath; // "./dir/dir2/file.txt"
+    private String filename; // "file.txt"
     private String encFilename; // updated by encryptHeader, it is the encrypted filename
-
+    
     /**
      * Instantiate a file operation
      *
@@ -34,17 +35,22 @@ public class VaultFile implements VaultElement {
      * @throws NoSuchPaddingException
      * @throws NoSuchAlgorithmException
      */
-    public VaultFile(Path filenamePath) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
+    public VaultFile(Path filenamePath, boolean encrypted) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         if (filenamePath == null) throw new IOException("filename cannot be null");
 
         this.filenamePath = filenamePath.normalize();
         this.folderPath = this.filenamePath.getParent() != null ? this.filenamePath.getParent() : Path.of(".");
-        this.filename = this.filenamePath.getFileName().toString();
-
+        
+        if (encrypted) {
+            this.encFilename = this.filenamePath.getFileName().toString();
+        } else {
+            this.filename = this.filenamePath.getFileName().toString();
+        } 
+        
+       
         this.gen = new SecureRandom();
         this.headerIV = new byte[IVLEN];
         this.c = Cipher.getInstance("AES/GCM/NoPadding");
-        this.encFilename = "";
     }
 
     /**
@@ -74,6 +80,8 @@ public class VaultFile implements VaultElement {
         String encFilenameStr = Path.of(this.encFilename.toString()).normalize().getFileName().toString(); // this.encFilename updated in encryptHeader
         srcPath = srcPath.normalize(); // remove redundant elements
         OutputStream encryptedOutput = Files.newOutputStream(Path.of(this.folderPath.toString(), encFilenameStr)); // encrypted file output
+
+        this.filenamePath = this.filenamePath.getParent().resolve(encFilenameStr);
 
         encryptedOutput.write(encHeader);
         encryptedOutput.write(encContent);
@@ -201,16 +209,16 @@ public class VaultFile implements VaultElement {
         int dstFileSize = (int) Files.size(inputFilePath); // MAX 2.14 GB !!!
         InputStream inputData = Files.newInputStream(inputFilePath); // input file stream
 
-        String originalFilename = this.decryptHeader(encKey, inputData, dstFileSize);
+        this.filename = this.decryptHeader(encKey, inputData, dstFileSize);
 
         dstFolderPath = dstFolderPath.normalize(); // remove redundant elements
-        Path dstFilePath = Path.of(dstFolderPath.toString(), originalFilename).normalize();
+        Path dstFilePath = Path.of(dstFolderPath.toString(), this.filename).normalize();
 
         // if a file with the same name already exists, we append an index to the new one to not overwrite the previous one
         if (dstFilePath.toFile().exists()) {
             int index = 0;
             do {
-                dstFilePath = Path.of(dstFolderPath.toString(), index + "-" + originalFilename).normalize();
+                dstFilePath = Path.of(dstFolderPath.toString(), index + "-" + this.filename).normalize();
                 index++;
             } while (dstFilePath.toFile().exists());
         }
@@ -319,8 +327,23 @@ public class VaultFile implements VaultElement {
     }
 
     @Override
-    public Path getRelativePath(Path vaultPath) {
+    public Path getRelPath(Path vaultPath) {
         return this.filenamePath.subpath(vaultPath.normalize().getNameCount(), this.filenamePath.getNameCount());
+    }
+
+    @Override
+    public Path getAbsPath() {
+        return this.filenamePath;
+    }
+
+    @Override
+    public String getName() {
+        return this.filename;
+    }
+
+    @Override
+    public String getEncName() {
+        return this.encFilename;
     }
 
 }

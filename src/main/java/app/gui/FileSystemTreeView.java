@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import app.core.Vault;
+import app.core.VaultItem;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
@@ -18,7 +19,9 @@ public class FileSystemTreeView extends TreeView<String> {
   private static Image folderImage = null;
 	private static Image fileImage = null;
 
-  public FileSystemTreeView(Path path) {
+  private Vault vault;
+
+  public FileSystemTreeView(Vault vault) {
     super();
 
     try {
@@ -27,9 +30,10 @@ public class FileSystemTreeView extends TreeView<String> {
     } catch (RuntimeException e) {
       System.err.println("Icons not found...");
     }
-     
-    TreeItem<String> root = new TreeItem<>(path.getFileName().toString());
-    addDirectoryItems(root, path);
+    
+    this.vault = vault;
+    TreeItem<String> root = new TreeItem<>(vault.getStoragePath().getFileName().toString());
+    addDirectoryItems(root, vault.getStoragePath());
     
     this.setRoot(root);
     this.setShowRoot(false);
@@ -67,9 +71,16 @@ public class FileSystemTreeView extends TreeView<String> {
     if (!(parent != null && file != null)) { return null; }
 
     // Avoid to display the vault configuration
-    if (Vault.isConfFile(file) || Vault.isMacFile(file)) { return null; }
+    if (Vault.isConfFile(file) || Vault.isMacFile(file) || Vault.isDirFile(file)) { return null; }
     
+    // If the content is encrypted get filename from vault item
     String filename = file.getFileName().toString();
+    if (file.startsWith(this.vault.getStoragePath())) {
+      Path relPath = file.subpath(this.vault.getStoragePath().getNameCount(), file.getNameCount());
+      VaultItem vaultFile = this.vault.getVaultFile(relPath);
+      filename = vaultFile.getName();
+    }
+
     TreeItem<String> item = new TreeItem<>(filename);
     
     // If the file is a directory recall the function with the directory as path
@@ -94,10 +105,7 @@ public class FileSystemTreeView extends TreeView<String> {
   public void add(Path path) {
     if (path == null) { return; }
     
-    TreeItem<String> root = addItem(this.getRoot(), path);
-    if (Files.isDirectory(path)) {
-      addDirectoryItems(root, path);
-    }     
+    addItem(this.getRoot(), path);   
   }
 
   /**

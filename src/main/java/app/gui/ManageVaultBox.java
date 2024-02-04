@@ -1,6 +1,5 @@
 package app.gui;
 
-import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -45,7 +44,6 @@ public class ManageVaultBox extends VBox {
   private ListView<Vault> listView;
   private FileSystemTreeView treeView;
   private TreeItem<String> selectedItem;
-  private Path   vaultPath;
   private Path unlockPath;
 
   public ManageVaultBox(Stage stage, ListView<Vault> listView, Vault vault) {
@@ -55,12 +53,6 @@ public class ManageVaultBox extends VBox {
     this.listView = listView;
     this.vault = vault;
     this.selectedItem = null;
-
-    Path vaultPath = vault.getStoragePath();
-    this.treeView = new FileSystemTreeView(vaultPath);
-    this.treeView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
-      this.selectedItem = (TreeItem<String>) newValue;
-    });
 
     if (this.vault.isLocked()) { 
       setLockedPane(); 
@@ -128,8 +120,9 @@ public class ManageVaultBox extends VBox {
       final Button confirmBtn = new Button("Unlock");
       confirmBtn.setOnAction(e -> {
         try {
-          if(this.unlockPath == null){
+          if (this.unlockPath == null) {
             new Alert(AlertType.WARNING, "The entered location is not valid", ButtonType.OK).show();
+            return;
           }
           this.vault.unlock(pswFld.getText(), this.unlockPath); // Get Path from directory chooser
           unlockStage.close();
@@ -166,6 +159,11 @@ public class ManageVaultBox extends VBox {
   }
 
   private void setUnlockedPane() {
+    this.treeView = new FileSystemTreeView(vault);
+    this.treeView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+      this.selectedItem = (TreeItem<String>) newValue;
+    });
+    
     final Label nameLbl = new Label(vault.getName());
     nameLbl.setFont(new Font("Arial Bold", 20));
     nameLbl.setPadding(new Insets(5));
@@ -175,18 +173,11 @@ public class ManageVaultBox extends VBox {
     final Button revealBtn = new Button("Reveal Content");
     revealBtn.setOnAction(e -> {
       try {
-         //Desktop.getDesktop().browseFileDirectory(new File(this.vault.getStoragePath()));
-         final String EXPLORER_EXE = "explorer.exe";
-
-         final String command = EXPLORER_EXE + " /SELECT,\"" + this.vault.getStoragePath() + "\\\"";
-         System.out.println(command);
-         try {
-           Runtime.getRuntime().exec(command);
-         } catch (IOException e1) {
-           System.err.println("Unsupported feature");
-           new Alert(AlertType.WARNING, "Cannot reveal content: feature not supported on this platform", ButtonType.OK).show();
-         }
-      } catch (RuntimeException exc) {
+        //Desktop.getDesktop().browseFileDirectory(new File(this.vault.getStoragePath()));
+        final String EXPLORER_EXE = "explorer.exe";
+        final String command = EXPLORER_EXE + " /SELECT,\"" + this.vault.getStoragePath() + "\\\"";
+        Runtime.getRuntime().exec(command);
+      } catch (IOException exc) {
         System.err.println("Unsupported feature");
         new Alert(AlertType.WARNING, "Cannot reveal content: feature not supported on this platform", ButtonType.OK).show();
       }
@@ -212,26 +203,62 @@ public class ManageVaultBox extends VBox {
     final Button removeBtn = new Button("Remove");
     removeBtn.setOnAction(e -> {
       if (this.selectedItem == null) { return; } 
-      
+
       Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to remove " + this.selectedItem.getValue() + "?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
       if (response.get() != ButtonType.OK) { return; }
-
-      this.treeView.remove(this.selectedItem);
+      
+      String file = ""; 
+      TreeItem<String> parent = this.selectedItem;
+      while (!parent.equals(this.treeView.getRoot())) {
+        file = parent.getValue() + (file.length() == 0 ? "" : (System.getProperty("file.separator") + file));
+        parent = parent.getParent();
+      }
+      
+      try {
+        this.vault.remove(Path.of(file));
+        this.treeView.remove(this.selectedItem);
+      } catch (IOException | InternalException e1) {
+        System.err.println("Error while deleting vault");
+        new Alert(AlertType.ERROR, "Cannot clear vault: error while deleting files", ButtonType.OK).show();
+      } catch (VaultLockedException e1) {
+        System.err.println("Locked Vault");
+        new Alert(AlertType.WARNING, "Cannot clear vault: the vault is locked", ButtonType.OK).show();
+      }      
     });
 
     final Button clearBtn = new Button("Clear");
     clearBtn.setOnAction(e -> {
       Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to delete the vault content?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
       if (response.get() != ButtonType.OK) { return; }
-      this.treeView.clear();
+      
+      try {
+        this.vault.clear();
+        this.treeView.clear();
+      } catch (IOException e1) {
+        System.err.println("Error while deleting vault");
+        new Alert(AlertType.ERROR, "Cannot clear vault: error while deleting files", ButtonType.OK).show();
+      } catch (VaultLockedException e1) {
+        System.err.println("Locked Vault");
+        new Alert(AlertType.WARNING, "Cannot clear vault: the vault is locked", ButtonType.OK).show();
+      }
     });
 
     final Button deleteBtn = new Button("Delete Vault");
     deleteBtn.setOnAction(e -> {
       Optional<ButtonType> response = new Alert(AlertType.CONFIRMATION, "Are you sure to delete the vault " + this.vault.getName() +"?", ButtonType.CANCEL, ButtonType.OK).showAndWait();
       if (response.get() != ButtonType.OK) { return; }
-      this.listView.getItems().remove(this.vault);
-      PersonalVault.saveStoredVaults(this.listView.getItems());
+      
+      try {
+        this.vault.delete();
+        this.listView.getItems().remove(this.vault);
+        PersonalVault.saveStoredVaults(this.listView.getItems());
+      } catch (IOException e1) {
+        System.err.println("Error while deleting vault");
+        new Alert(AlertType.ERROR, "Cannot delete vault: error while deleting", ButtonType.OK).show();
+      } catch (VaultLockedException e1) {
+        System.err.println("Locked Vault");
+        new Alert(AlertType.WARNING, "Cannot delete vault: the vault is locked", ButtonType.OK).show();
+      }
     });
 
     final HBox bottomBox = new HBox(SPACING, addBtn, removeBtn, clearBtn, deleteBtn);

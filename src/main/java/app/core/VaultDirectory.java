@@ -16,13 +16,15 @@ import java.util.Base64;
 
 import static app.core.Constants.*;
 
-public class VaultDirectory implements VaultElement{
-
-    private final Path folderPath; // "/dir"
-    private final Path folderNamePath; // "/dir/dir2"
+public class VaultDirectory implements VaultItem{
+    
     private final SecureRandom gen; // random bytes generator
     private final Cipher c;
     private byte[] headerIV; // Initialization Vector of the header
+    
+    private Path folderPath; // "/dir"
+    private Path folderNamePath; // "/dir/dir2"
+    private Path encDirFile;
     
     private String encName; // updated by encryptHeader, it is the encrypted directory name
     private String folderName; // "dir2"
@@ -40,8 +42,10 @@ public class VaultDirectory implements VaultElement{
         
         this.folderNamePath = folderNamePath.normalize();
         this.folderPath =  this.folderNamePath.getParent() != null ? this.folderNamePath.getParent() : Path.of(".");;
+        
         if (encrypted) {
             this.encName = this.folderNamePath.getFileName().toString();
+            this.encDirFile = this.folderNamePath.resolve(this.encName + ".dir");
         } else {
             this.folderName = this.folderNamePath.getFileName().toString();
         }        
@@ -75,7 +79,10 @@ public class VaultDirectory implements VaultElement{
         Path dstFolderPath = this.folderPath.resolve(encDestinationStr);
         Files.createDirectory(dstFolderPath);
 
-        OutputStream encryptedOutput = Files.newOutputStream(Path.of(dstFolderPath.toString(), encDestinationStr + ".dir")); // encrypted file output
+        this.folderNamePath = this.folderNamePath.getParent().resolve(encDestinationStr);
+        this.encDirFile = Path.of(dstFolderPath.toString(), encDestinationStr + ".dir");
+        
+        OutputStream encryptedOutput = Files.newOutputStream(this.encDirFile); // encrypted file output
         encryptedOutput.write(encHeader);
         encryptedOutput.close();
 
@@ -161,8 +168,7 @@ public class VaultDirectory implements VaultElement{
             } while (dstFolderPath.toFile().exists());
         }
 
-        Files.createDirectory(dstFolderPath);  // TODO Handle directory already exist
-
+        Files.createDirectory(dstFolderPath);
         return dstFolderPath.getFileName().toString();
     }
 
@@ -209,17 +215,28 @@ public class VaultDirectory implements VaultElement{
         String folderStr = new String(folderName, StandardCharsets.UTF_8);
         return folderStr;
     }
-
-    public String getEncName() {
-        return this.encName;
+    
+    @Override
+    public Path getRelPath(Path vaultPath) {
+        return this.folderNamePath.subpath(vaultPath.normalize().getNameCount(), this.folderNamePath.getNameCount());
     }
 
-    public String getFolderName() {
+    @Override
+    public Path getAbsPath() {
+        return this.folderNamePath;
+    }
+
+    @Override
+    public String getName() {
         return this.folderName;
     }
 
     @Override
-    public Path getRelativePath(Path vaultPath) {
-        return this.folderNamePath.subpath(vaultPath.normalize().getNameCount(), this.folderNamePath.getNameCount());
+    public String getEncName() {
+        return this.encName;
+    }
+    
+    public Path getEncDirFile() {
+        return this.encDirFile;
     }
 }
